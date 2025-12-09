@@ -7,7 +7,7 @@
 This folder contains the complete training recipes (YAML files, suitable for Lingua codebase) for reproducing our 16 released model weights available [on Hugging Face](https://huggingface.co/facebook/PhysicsLM4.2__LlamaCanon-8B-Nemo-1T-lr0.003). The main model parameters are as follows:
 
 <div align="center">
-<img src="../lingua_results/table-params.png" style="object-fit: contain; width: 70%; "/>
+<img src="../canon_llama_results/table-params.png" style="object-fit: contain; width: 70%; "/>
 </div>
 
 We additionally note the following:
@@ -84,12 +84,19 @@ We hope these released results inspire greater confidence among users of Canon l
 ## 📖Citation
 Please cite the following if you use our models or findings in your research:
 ```bibtex
-@article{Allenzhu2025-canon,
+@inproceedings{Allen2025-canon,
   author = {{Allen-Zhu}, Zeyuan},
   title = {{Physics of Language Models: Part 4.1, Architecture Design and the Magic of Canon Layers}},
   year = {2025},
-  month = {May},
-  journal = {SSRN Electronic Journal},
-  note = {\url{https://ssrn.com/abstract=5240330}}
+  booktitle = {Proceedings of the 39th Conference on Neural Information Processing Systems},
+  series = {NeurIPS~'25},
+  note = {Full version available at \url{https://ssrn.com/abstract=5240330}} 
+}
+@misc{Allen2025-resonate,
+    title = {{Physics of Language Models: Part 4.2, Canon Layers at Scale where Synthetic Pretraining Resonates in Reality}},
+    author = {{Allen-Zhu}, Zeyuan},
+    year = {2025},
+    url = {https://physics.allen-zhu.com/part-4-architecture-design/part-4-2},
+    note = {Code released at \url{https://github.com/facebookresearch/PhysicsLM4}},
 }
 ```

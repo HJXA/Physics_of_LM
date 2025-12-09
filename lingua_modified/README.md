@@ -4,9 +4,24 @@ This is a modification of the original [Meta Lingua](https://github.com/facebook
 
 **Author of this modification**: Zeyuan Allen-Zhu  
 
-Our extension introduces several enhancement features, including support for Canon layers, QK-layernorm, Z-loss, and Partial RoPE. These features are explained in detail below.
+Our version introduces **Canon Layers** to both **Transformer (Llama)** and **linear architectures (GLA, GDN, Mamba2)**, along with several architectural enhancements. The corresponding **entry points for pretraining** are listed below:
 
-## Key Features and Enhancements
+- **Transformer (Llama):** `python -m lingua.stool script=apps.main.train nodes=4 config=apps/main/configs/canon_1B.yaml account=<bla> qos=<bla>`
+- **Gated Linear Attention (GLA)**: `python -m lingua.stool script=apps.gla.train nodes=4 config=apps/gla/configs/gla5_canon_1B.yaml account=<bla> qos=<bla>`
+- **Gated DeltaNet (GDN)**: `python -m lingua.stool script=apps.gla.train nodes=4 config=apps/gla/configs/gdn2_canon_1B.yaml account=<bla> qos=<bla>`
+- **Mamba2**: `python -m lingua.stool script=apps.gla.train nodes=4 config=apps/gla/configs/mamba2_canon_1B.yaml account=<bla> qos=<bla>`
+
+**Note**: `stool` stands for SLURM tool. If you prefer to launch locally using `torchrun`, refer to the original Lingua `README.md` (included at the end).
+
+In addition to Canon Layers, this modification adds several **architectural improvements** such as QK LayerNorm, z-loss, Partial RoPE (for Transformer), and low-rank gating (for linear models). These features are described in detail in the sections below.
+
+## Transformer (Llama) Pretraining: Key Features and Enhancements
+
+The entry for pretraining remains to be
+```bash
+python -m lingua.stool script=apps.main.train nodes=4 config=apps/main/configs/canon_1B.yaml account=<bla> qos=<bla>
+```
+The training recipes (yaml files) can be found in [`../lingua_recipes`](../lingua_recipes), although an example yaml file with Canon layers is in [`apps/main/configs/canon_1B.yaml`](apps/main/configs/canon_1B.yaml).
 
 ### 1. **Canon Layers**  
 Reference: [Physics of Language Models: Part 4.1, Architecture Design and the Magic of Canon Layers](https://ssrn.com/abstract=5240330).
@@ -25,10 +40,7 @@ Canon layers are supported at optional points (A/B/C/D) in the architecture. Con
   Adds bias terms to Canon layers. This is **NOT recommended**. If enabled, ensure to modify `reset_parameters` for appropriate initial bias values.  
 
 ### 2. **QK-Layernorm**  
-References:  
-- [Scaling Vision Transformers to 22 Billion Parameters](https://arxiv.org/abs/2302.05442)  
-- [Small-scale proxies for large-scale Transformer training instabilities](https://arxiv.org/abs/2309.14322).  
-
+References:  [*Scaling Vision Transformers to 22 Billion Parameters*](https://arxiv.org/abs/2302.05442) and [*Small-scale proxies for large-scale Transformer training instabilities*](https://arxiv.org/abs/2309.14322). 
 Configurations:  
 - **`model.qk_norm`** *(default: `False`)*:  
   Enables QK-Layernorm with trainable parameters.  
@@ -36,10 +48,7 @@ Configurations:
 > **Note**: For our released models (≤8B size), enabling QK-Layernorm did not show noticeable improvements in training performance/stability.
 
 ### 3. **Z-Loss**  
-References:  
-- [PaLM: Scaling Language Modeling with Pathways)](https://arxiv.org/abs/2204.02311)  
-- [Small-scale proxies for large-scale Transformer training instabilities](https://arxiv.org/abs/2309.14322).  
-
+References: [*PaLM: Scaling Language Modeling with Pathways*](https://arxiv.org/abs/2204.02311) and [*Small-scale proxies for large-scale Transformer training instabilities*](https://arxiv.org/abs/2309.14322).  
 Configurations:  
 - **`model.z_loss`** *(default: `False`)*:  
   Adds a Z-loss term `0.0001 * log^2` to the loss function.  
@@ -52,22 +61,40 @@ Configurations:
 
 > **Insight**: As shown in [*Physics of Language Models: Part 4.1*](https://ssrn.com/abstract=5240330), when Canon layers are enabled, RoPE usage can be greatly reduced, such as to 25% of `head_dim`. In fact, it is a folklore that RoPE "hurts" model performance, but without Canon layers, it can be hard to reduce or get rid of RoPE (e.g., Alibi is not as effective as Canon layers for the purpose of removing RoPE).
 
-## Model Weights
+### Model Weights and Conversion to Huggingface Format
 
-Pretrained model weights are available on [Hugging Face](https://huggingface.co/facebook/PhysicsLM4.2__LlamaCanon-8B-Nemo-1T-lr0.003). The training recipes (yaml files) can be found in [`../lingua_recipes`](../lingua_recipes), although an example yaml file with Canon layers is in [`apps/main/configs/canon_1B.yaml`](apps/main/configs/canon_1B.yaml).
+Our pretrained 1-8B LlamaCanon model weights are open-sourced on [Hugging Face](https://huggingface.co/facebook/PhysicsLM4.2__LlamaCanon-8B-Nemo-1T-lr0.003).
 
 
-## Comparison and Conversion to Huggingface
-
-The Transformer model implementation in the Meta Lingua repository is nearly identical to `LlamaModel` [on Huggingface](https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py). However, there is one critical difference when applying RoPE: the Meta Lingua codebase uses a different coordinate permutation for RoPE application.
+The Transformer model implementation in the Meta Lingua repository is nearly identical to `LlamaModel` [on Huggingface](https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py), with one key distinction: **RoPE (Rotary Position Embedding)** is applied using a *different coordinate permutation* in Meta Lingua.
 
 To bridge this gap, we provide a [**conversion script**](../huggingface/) that allows users to convert any models pretrained using the Meta Lingua codebase (including our added Canon layers, QK-norm, or Partial RoPE) into a Huggingface-compatible model. The converted model can then be seamlessly used for inference, including `model.generate`.
 
 This conversion process ensures smooth interoperability between Meta Lingua's pretrained models and the Huggingface ecosystem.
 
+## Linear Model (GLA/GDN/Mamba2) Pretraining: Key Features and Enhancements
+
+The entry for pretraining linear models is newly added at [apps/gla](apps/gla):
+```bash
+python -m lingua.stool script=apps.gla.train nodes=1 config=apps/gla/configs/gla5_canon_1B.yaml account=<bla> qos=<bla>
+python -m lingua.stool script=apps.gla.train nodes=1 config=apps/gla/configs/gdn2_canon_1B.yaml account=<bla> qos=<bla>
+python -m lingua.stool script=apps.gla.train nodes=1 config=apps/gla/configs/mamba2_canon_1B.yaml account=<bla> qos=<bla>
+```
+The training recipes (yaml files) can be found in [`../lingua_linear_recipes`](../lingua_linear_recipes), although example yaml files are given in [`apps/gla/configs/`](apps/gla/configs/).
+
+Detailed architecture enhancements (including our GLA5, GDN2 modifications to GLA/GDN) can be found in [huggingface/README.md](huggingface/README.md).
+
 ## License
 
 The original Lingua codebase adheres to its [BSD-3-Clause](LICENSE) license, but all of our modifications are under [Apache 2.0](../LICENSE).
+
+---
+
+---
+
+---
+
+---
 
 ---
 

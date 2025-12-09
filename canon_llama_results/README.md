@@ -1,8 +1,11 @@
-# Physics of Language Models: LlamaCanon Release
+# Physics of Language Models: Part 4.2, Canon Layers at Scale where Synthetic Pretraining Resonates in Reality
+## Transformer Model + Canon Layers
+
+**Author**: Zeyuan Allen-Zhu  
 
 Our released paper, [*Physics of Language Models: Part 4.1, Architecture Design and the Magic of Canon Layers*](https://ssrn.com/abstract=5240330), demonstrates that the Canon layer is a powerful architecture add-on that improves language model performance on multiple fronts using a synthetic pretraining playground, perhaps for *every* possible architecture (original Transformer or linear models). 
 
-In this release, we provide code and pre-trained models to showcase how these findings extend to real-world pretraining. Specifically, we compare the vanilla *Llama architecture* with our modified *LlamaCanon* variant, both pretrained under the same *controlled settings*.
+🔴 In this first release, we provide code and pre-trained models to showcase how these findings extend to real-world pretraining. Specifically, we compare the vanilla *Llama architecture* with our modified *LlamaCanon* variant, both pretrained under the same *controlled settings*. (Results for linear models combined with Canon are in our second release: [`../canon_linear_results`](../canon_linear_results/).)
 
 <div align="center">
 <img src="model-training-time.png" style="object-fit: contain; width: 90%; " /><br/>
@@ -25,7 +28,7 @@ A detailed summary of the 16 models we release along with their parameters can b
 <em><b>Figure 2:</b> Names and model parameters.</em>
 </div>
 
-(full configs see [lingua_recipes](../lingua_recipes).)
+(full configs see [canon_llama_recipes](../canon_llama_recipes).)
 
 ## Performance Metrics
 
@@ -119,14 +122,19 @@ See [Hugging Face](https://huggingface.co/collections/facebook/physics-of-langua
 
 Please cite the following if you use our models or findings in your research:
 ```bibtex
-@article{Allenzhu2025-canon,
+@inproceedings{Allen2025-canon,
   author = {{Allen-Zhu}, Zeyuan},
   title = {{Physics of Language Models: Part 4.1, Architecture Design and the Magic of Canon Layers}},
   year = {2025},
-  month = {May},
-  journal = {SSRN Electronic Journal},
-  note = {\url{https://ssrn.com/abstract=5240330}}
+  booktitle = {Proceedings of the 39th Conference on Neural Information Processing Systems},
+  series = {NeurIPS~'25},
+  note = {Full version available at \url{https://ssrn.com/abstract=5240330}} 
+}
+@misc{Allen2025-resonate,
+    title = {{Physics of Language Models: Part 4.2, Canon Layers at Scale where Synthetic Pretraining Resonates in Reality}},
+    author = {{Allen-Zhu}, Zeyuan},
+    year = {2025},
+    url = {https://physics.allen-zhu.com/part-4-architecture-design/part-4-2},
+    note = {Code released at \url{https://github.com/facebookresearch/PhysicsLM4}},
 }
 ```
-
-Note: A technical report for this model release will appear under *Physics of Language Models: Part 4.2*. Until then, please cite the above paper.
