@@ -4,6 +4,16 @@
 #
 # This gives the necessary code to generate our [Mano] synthetic arithmetics datasets used in [Physics of language models: Part 4.1]
 #
+"""
+Depo 数据生成脚本（循环位移检索任务）。
+
+直观上：
+- 先构造 n 个多 token“值”并形成环；
+- 上下文中给出一系列相邻映射（v_i -> v_{i+1}）；
+- 再追加若干查询：给定步长 k 和起点 v1，要求输出位移后的 v2。
+
+返回的 `label` 仅在答案 token 位置为 1，便于只对答案部分做训练。
+"""
 
 
 def generate_multi_token_words(rng, n: int,
@@ -11,7 +21,9 @@ def generate_multi_token_words(rng, n: int,
     min_tlen: int = 5,
     max_tlen: int = 7
 ):
+    """生成 n 个不重复多 token 伪词，末 token 作为分词结束标记。"""
     def my_sample(length):
+        """采样一个固定长度伪词并转成可哈希 tuple。"""
         toks = [rng.randint(1, mini_vocab) for _ in range(length)]
         toks[-1] += mini_vocab  # end of word
         return tuple(toks)      # tuples are hashable 
@@ -31,6 +43,15 @@ rng = random.Random(42)
 ## QA=True means it's test data, in which we force n = N and k = powers of 2 (feel free to change this)
 ##
 def depo_data(N, K, M=10, QA=False, separator = False, mini_vocab: int = 3, min_tlen: int = 5, max_tlen: int = 7):
+    """生成一条 Depo 样本。
+
+    参数：
+    - N: 上限规模；
+    - K: 最大位移步长；
+    - M: 查询条数上限；
+    - QA: True 时固定 n=N 且按固定幂次步长采样（评测模式）；
+    - separator: 是否在每条映射前插入 9700 分隔 token。
+    """
     if QA:
         n = N
     else:

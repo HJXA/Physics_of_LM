@@ -5,6 +5,16 @@
 # This gives the necessary code to generate our [bioS]/[bioR] datasets used in [Physics of language models: Part 3.1, 3.2, 3.3], 
 #      in which the [bioS] dataset was also used in [Physics of language models: Part 4.1] as Task [Capo].
 #
+"""
+Capo（bioS/bioR）数据生成与增强脚本。
+
+文件包含三个关键函数：
+1) generate_prompt2: 构造给 Llama 生成人物传记的提示词（用于 bioR）；
+2) get_text_simple3: 直接合成结构化传记文本（用于 bioS）；
+3) augmentation_permutation2: 对传记句子做重排与代词/姓名修复，增强知识位置鲁棒性。
+
+说明：该文件以“模板池 + 随机采样 + 后处理修复”为主，不涉及训练逻辑。
+"""
 
 
 ###################################################################################################################
@@ -13,6 +23,15 @@
 # mode=0 was our prompt for Llama1 and mode=1 was for Llama2
 ###################################################################################################################
 def generate_prompt2(self, word=None, mode=0):
+    """生成用于大模型写人物传记的英文提示词。
+
+    参数：
+    - word: 期望词数（可空）；
+    - mode: 0 表示旧版提示模板，1 表示 Llama2 模板。
+
+    该函数会把人物关键事实（学校、专业、出生地、公司、生日）
+    以随机句式拼接进 prompt，提升生成多样性。
+    """
     if mode==1: # for llama2
         prompt = f"Write a {word}-word biography"
         prompt += f" about a person whose name is {self.first_name} {self.middle_name} {self.last_name}."
@@ -93,6 +112,13 @@ def generate_prompt2(self, word=None, mode=0):
 #   but you can also use our augmentation_permutation2 method below.
 ###################################################################################################################
 def get_text_simple3(person, order=0, reverse_md = False):
+    """根据结构化 `person` 信息直接生成一段合成传记文本。
+
+    - order 控制公司城市/公司名称两条信息的先后顺序；
+    - reverse_md 控制生日中的“月-日”排列格式。
+
+    函数内部维护多组同义句模板，通过随机采样降低表述单一性。
+    """
     sentence_structures1 = [
         "{name} was born on {birthday}.",
         "{name}'s birthday falls on {birthday}.",
@@ -439,6 +465,15 @@ def get_text_simple3(person, order=0, reverse_md = False):
 #   full name and there are numerous edge cases; but we manually checked and such edge cases are sufficiently rare.
 ###################################################################################################################
 def augmentation_permutation2(person, text):
+    """对传记做句子级重排，并修复首句实体指代。
+
+    主要流程：
+    1) 预清洗文本与特殊缩写保护（避免句点切分错误）；
+    2) 识别原文中的人物指代形式（The person / He / She / They / 姓名片段）；
+    3) 句子乱序后，强制在首句恢复完整姓名；
+    4) 其余句子按需要回退到代词形式；
+    5) 恢复特殊缩写中的句点。
+    """
 
     text = text.replace('(50 words)','')
     text = text.replace('\n',' ').replace('  ',' ').replace('  ',' ')

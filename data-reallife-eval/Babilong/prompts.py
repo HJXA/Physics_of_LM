@@ -8,11 +8,32 @@
 # These new prompts were consistently used in the paper <Physics of Language Models: Part 4.1, Architecture Design and the Magic of Canon Layers>
 # as well as all the experiments in this git repo.
 #
+"""
+本文件用于定义 Babilong 任务的提示词模板（prompt templates）与各子任务的默认指令。
+
+核心内容包括：
+1) 通用模板拼接规则（instruction / examples / post_prompt / context / question）；
+2) 针对 qa1~qa5 的 Zeyuan 版本模板与提示词；
+3) 完整的 qa1~qa20 默认提示词配置；
+4) 一个统一的格式化函数，用于将上下文与问题组装成模型输入。
+
+说明：
+- 该文件主要是“数据配置 + 字符串拼接”，几乎不包含复杂算法逻辑；
+- 下游调用通常按任务编号（如 qa1、qa2）取出 instruction/examples/post_prompt，
+    再通过 get_formatted_input 组装成最终输入文本。
+"""
+
+# 任务级模板：由「任务说明 + 示例 + 后置约束」组成。
 TASK_TEMPLATE = '{instruction}\n\n{examples}\n\n{post_prompt}'
+# 用户输入模板：将真实上下文与问题封装到统一格式中。
 USER_TEMPLATE = '<context>\n{context}\n</context>\n\nQuestion: {question}'
+# 默认完整模板：任务级模板和用户输入模板之间使用空行分隔。
 DEFAULT_TEMPLATE = f'{TASK_TEMPLATE}\n\n{USER_TEMPLATE}'
 
 # Zeyuan's edit note: this is new
+# Zeyuan 版本模板（qa1~qa5）：
+# 与 DEFAULT_TEMPLATE 相比，末尾显式追加 "Answer: "，
+# 便于模型直接续写答案，减少输出格式偏移。
 DEFAULT_TEMPLATE_ZEYUAN = {
     'qa1': f'{TASK_TEMPLATE}{USER_TEMPLATE}\nAnswer: ',
     'qa2': f'{TASK_TEMPLATE}{USER_TEMPLATE}\nAnswer: ',
@@ -33,16 +54,30 @@ CUSTOM_SYSTEM_PROMPTS = {
 
 
 def get_formatted_input(context, question, examples, instruction, post_prompt, template=DEFAULT_TEMPLATE):
-    # instruction - task instruction
-    # examples - in-context examples
-    # post_prompt - any additional instructions after examples
-    # context - text to use for qa
-    # question - question to answer based on context
+    """
+    将任务配置与用户样本拼接成最终可送入模型的输入字符串。
+
+    参数说明：
+    - context: 用于问答的事实文本（通常是长上下文）。
+    - question: 当前需要回答的问题。
+    - examples: few-shot 示例（可为空字符串）。
+    - instruction: 任务主指令，定义推理规则和回答目标。
+    - post_prompt: 示例后的补充约束（如输出格式要求）。
+    - template: 格式模板，默认使用 DEFAULT_TEMPLATE。
+
+    返回：
+    - 去除首尾空白后的完整输入文本。
+    """
     formatted_input = template.format(instruction=instruction, examples=examples, post_prompt=post_prompt,
                                       context=context.strip(), question=question)
     return formatted_input.strip()
 
 # Zeyuan's edit note: this is new
+# Zeyuan 的 qa1~qa5 提示词配置。
+# 每个任务包含三段：
+# - instruction: 任务规则与行为要求；
+# - examples: 供模型模仿的 few-shot 示例；
+# - post_prompt: 示例后的补充约束（本配置中大多为空）。
 DEFAULT_PROMPTS_ZEYUAN = {
     'qa1': {
         'instruction':
@@ -163,6 +198,9 @@ DEFAULT_PROMPTS_ZEYUAN = {
     },
 }
 
+# 官方/通用的完整 Babilong 提示词配置（qa1~qa20）。
+# 字典键是任务编号，值统一采用 instruction / examples / post_prompt 三段结构。
+# 评测时通常按任务名索引对应配置，然后与具体样本通过 get_formatted_input 组装。
 DEFAULT_PROMPTS = {
     'qa1': {
         'instruction':

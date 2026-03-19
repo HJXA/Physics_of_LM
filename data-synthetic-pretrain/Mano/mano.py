@@ -4,14 +4,37 @@
 #
 # This gives the necessary code to generate our [Mano] synthetic arithmetics datasets used in [Physics of language models: Part 4.1]
 #
+"""
+Mano 数据生成脚本（模 arithmetic 表达式求值任务）。
+
+任务形式：
+- 随机递归生成表达式树（+/-/*//）；
+- 叶子为有限域元素（模 value_mod）；
+- 在 token 序列末尾附上答案 token。
+
+其中 `knowledge_augment=True` 会随机切换等价编码（如运算符变体），
+用于增强模型对表面形式变化的鲁棒性。
+"""
 
 
 def encode_pure_arithmetic(rng, qids, lens, ops, knowledge_augment = True):
+    """生成一条算术样本，输出为 token 序列。
+
+    - qids/lens: 控制不同题型 id 与表达式深度；
+    - ops: 允许的运算集合；
+    - 返回序列包含：BOS、题型标记、表达式、答案标记、答案值。
+    """
     this_idx = rng.randint(0, len(lens)-1)
     this_len = lens[this_idx]
     this_qid = qids[this_idx]
 
     def gen(ll, ops):
+        """递归生成深度为 ll 的表达式及其可计算答案。
+
+        返回 `(seq1, seq2, value)`：
+        - seq1/seq2 是两种可用于增强的编码形式；
+        - value 是该子表达式在模空间内的取值（若不可定义则为 None）。
+        """
         nonlocal this_people_count, this_people
         if ll==0:
             vid = rng.randint(0, value_mod-1)

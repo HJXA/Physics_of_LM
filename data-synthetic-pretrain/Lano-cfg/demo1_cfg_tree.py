@@ -11,16 +11,29 @@
 # COMMENT: This can be useful for users interested in probing 
 #      --- because you need to use the NT symbol (parsing tree) as labels for linear probing
 # 
+"""
+Demo1（解析树版）
+
+用途：
+1) 生成终结符序列；
+2) 同时导出对应解析树标签（NT 层信息）；
+3) 使用 DP 验证并回收一组可行解析树。
+
+适用于探针任务（probing），因为可直接用 NT 信息作为监督标签。
+"""
+
 from data_cfg import CFG_Config
 import random
 
 if __name__ == '__main__':
+    # 1) 加载并打印 CFG
     # Load a config file, say cfg3k.
     config = CFG_Config.from_graph("configs/cfg3k.json")
 
     # Visualize the CFG rules (for fun)
     config.print_graph()
 
+    # 2) 生成纯终结符序列 + 带树标签序列
     rng = random.Random(7711)  # NOT numpy rng
     seq = config.generate_onedata_pure(rng)
     rng = random.Random(7711)
@@ -73,6 +86,7 @@ if __name__ == '__main__':
     #  1) the NT symbols (odd ppositions) are stored in the last transformer layer --- up to linear transformation (linear probing)
     #  2) the NT boundary information (i.e., those i with seq_tree[i][2*j+1] != seq_tree[i+1][2*j+1]) are also stored in the last transformer layer
 
+    # 3) 用快速 DP 校验可行性，并获得一组可行解析
     correct, dp_sol, _, _ = config.solve_dp_noneq_fast(seq, no_debug=True) 
     # As we saw in demo0, correct = 0 or 10000 indicating if seq satisfies the CFG (0 for yes, 10000 for no)
     # Additionally, dp_sol is a valid parsing tree (if correct == 0) or None (if correct == 10000).

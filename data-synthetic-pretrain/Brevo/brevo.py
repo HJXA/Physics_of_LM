@@ -4,6 +4,17 @@
 #
 # This gives the necessary code to generate our [Mano] synthetic arithmetics datasets used in [Physics of language models: Part 4.1]
 #
+"""
+Brevo 数据生成脚本（拓扑排序任务）。
+
+核心思路：
+1) 构造一个带父依赖关系的 DAG；
+2) 随机选取查询节点，只保留其可达子图；
+3) 输出该子图的一个合法拓扑序作为答案；
+4) 可选地将“节点”编码成多 token 伪词（multi=True）以提高任务复杂度。
+
+该文件同时提供了输出解析函数，用于验证模型生成答案是否满足拓扑约束。
+"""
 
 
 def generate_multi_token_words(rng, n: int,
@@ -11,7 +22,13 @@ def generate_multi_token_words(rng, n: int,
     min_tlen: int = 5,
     max_tlen: int = 7
 ):
+    """生成 n 个不重复的“多 token 伪词”。
+
+    每个伪词末尾 token 落在 (mini_vocab, 2*mini_vocab] 区间，
+    用于作为“单词结束符”做切分。
+    """
     def my_sample(length):
+        """按指定长度采样一个可哈希伪词（tuple）。"""
         toks = [rng.randint(1, mini_vocab) for _ in range(length)]
         toks[-1] += mini_vocab  # end of word
         return tuple(toks)      # tuples are hashable 
@@ -26,7 +43,15 @@ def generate_multi_token_words(rng, n: int,
 
 
 class TopoSortDepthStats:
+    """拓扑排序任务生成与验证器。"""
+
     def __init__(self, n, vocab_size=125, max_in=4):
+        """初始化图规模和约束。
+
+        - n: 图节点数；
+        - vocab_size: 节点 token 池大小；
+        - max_in: 预留参数（当前主要由 degree_constraint 控制）。
+        """
         self.n = n
         self.vocab_size = vocab_size
         self.max_in = max_in
@@ -34,6 +59,10 @@ class TopoSortDepthStats:
         
 
     def generate_dag(self, rng):
+        """生成带约束的 DAG。
+
+        约束目标：每个节点最多依赖 4 个父节点，且每个父节点最多被 4 个子节点依赖。
+        """
         nodes = rng.sample(range(1, self.vocab_size + 1), self.n)
         dag = defaultdict(list)
         if self.degree_constraint == 'A_dep_B_for_at_most_4_Bs_and_4_As_with_leaves_on_left':
@@ -57,6 +86,7 @@ class TopoSortDepthStats:
         return nodes, dag
 
     def subtree_from_query(self, dag, query):
+        """从 query 逆向搜可达父节点，提取查询相关子图。"""
         visited = set()
         stack = [query]
         while stack:
@@ -76,6 +106,7 @@ class TopoSortDepthStats:
         return filtered
 
     def topological_sort(self, dag, rng):
+        """对给定子图执行随机化拓扑排序。"""
         indegree = {node: 0 for node in dag}
         for node in dag:
             for parent in dag[node]:
@@ -93,6 +124,7 @@ class TopoSortDepthStats:
         return order
 
     def compute_graph_depth(self, dag, query):
+        """计算 query 到任一叶子节点的最短逆向距离。"""
         distance = {query: 0}
         queue = deque([query])
         while queue:
@@ -107,6 +139,7 @@ class TopoSortDepthStats:
         return min(distance.get(leaf, float('inf')) for leaf in leaves if leaf in distance)
 
     def generate_sample(self, rng):
+        """生成一条样本：原图、答案拓扑序、以及查询深度。"""
         nodes, dag = self.generate_dag(rng)
 
         start_index = max(len(nodes) * 3 // 4, len(nodes) - 1)  # safe even if len(nodes) == 2
@@ -121,6 +154,14 @@ class TopoSortDepthStats:
 
 
     def generate_tokens(self, rng, multi=False):
+        """将图任务编码成 token 序列。
+
+        返回值：
+        - tokens: 输入 + 目标序列拼接后的 token；
+        - token_type: 辅助标签（主要用于分析/可视化）；
+        - list_label: 训练掩码，1 表示答案区间；
+        - depth: 该样本查询深度。
+        """
         dag, topo, depth = self.generate_sample(rng)
         query = topo[-1]
 
@@ -176,6 +217,7 @@ class TopoSortDepthStats:
        
     @staticmethod
     def parse_tokens(tokens):
+        """解析并校验单 token 版本输出是否拓扑合法。"""
         if tokens[0] != bos_token_id or tokens[-1] != bos_token_id:
             return False, None, None
         try:
@@ -232,6 +274,7 @@ class TopoSortDepthStats:
     # Can use the following trivial code to evaluate a model's output --- topsort answer is not unique
     @staticmethod
     def parse_tokens_multi(tokens, mini_vocab=4):
+        """解析并校验 multi-token 版本输出是否拓扑合法。"""
         tokens = [a for a in tokens if a!=9700]
         if tokens[0] != bos_token_id or tokens[-1] != bos_token_id:
             return False, None, None
@@ -307,6 +350,7 @@ rng = random.Random(42)
 # NOTE: during testing, we enforce n = N and the code is NOT provided here
 
 def topsort_data(N, multi=False):
+    """按训练分布采样图规模，返回一条 Brevo 训练样本。"""
     _distribution_list_to_choose = list(range(3, N+1))
     power, bias = 1, pow(N, 0.5)
     p = [1.0 / (pow(i, power) + bias + 1e-12) for i in _distribution_list_to_choose]

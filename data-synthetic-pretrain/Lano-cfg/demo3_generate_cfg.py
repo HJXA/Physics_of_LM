@@ -10,17 +10,28 @@
 #
 # COMMENT: This can be useful for users interested in probing --- because you need the NT symbol information to as the labels for probing
 # 
+"""
+Demo3（生成 + 分布分析模板）
+
+该示例与 Demo2 结构接近，重点在于给出一个可复用脚手架：
+- 生成合法 CFG 序列；
+- 计算真实 next-token 分布；
+- 进一步做 KL 或其他分布级评估。
+"""
+
 from data_cfg import CFG_Config
 import random
 import numpy as np
 
 if __name__ == '__main__':
+    # 1) 加载并打印 CFG
     # Load a config file, say cfg3f.
     config = CFG_Config.from_graph("configs/cfg3f.json")
 
     # Visualize the CFG rules (for fun)
     config.print_graph()
 
+    # 2) 生成一条合法终结符序列
     # Generate a valid sequence
     rng = random.Random(7711)  # NOT numpy rng
     seq = config.generate_onedata_pure(rng)
@@ -34,6 +45,7 @@ if __name__ == '__main__':
 
     # KL-divergence DP (for evaluating the distribution closeness, in addition to accuracy)
     if True:
+        # 3) 通过高精度 DP 计算真实 next-token 条件分布
         # Using DP to compute the ground-truth next-token distribution conditioning on the prefix.
         # WARNING: seq must be a valid sequence for this function call
         # TIP: I also have a low-precision (faster) function config.solve_dp_prob that will work for cfg3f, 
@@ -50,6 +62,7 @@ if __name__ == '__main__':
         #    In this example, let us take your_dist = target_dist with some minor changes
         your_dist = target_dist.copy()
         your_dist[-1] = [1,0,0,0] # say that your code predicts EOS with 100% probability for the last token
+        # 4) 计算 KL(target || your)
         epsilon = 1e-5
         target_dist1 = (target_dist + epsilon) / (target_dist + epsilon).sum(axis=1, keepdims=True)
         your_dist1 = (your_dist + epsilon) / (your_dist + epsilon).sum(axis=1, keepdims=True)

@@ -2,6 +2,20 @@
 #
 # Author: Zeyuan Allen-Zhu
 #
+"""
+Lano-CFG 核心实现文件。
+
+本文件提供两类能力：
+1) CFG 图结构构建、保存、读取与样本生成；
+2) 基于动态规划（DP）的 CFG 校验、解析、最小修改距离与条件概率计算。
+
+主要类：
+- CFG_Node: 单个 CFG 节点（可表示 NT 或 T 层元素）；
+- CFG_Config: 一整套 CFG 配置与推理工具。
+
+提示：该实现包含研究用途的多分支功能，部分分支预留未公开（会 assert False）。
+"""
+
 from __future__ import print_function, absolute_import
 
 import torch.nn as nn
@@ -20,6 +34,12 @@ class CFG_Node():
     rng = None
 
     def __init__(self, config, depth, id, name):
+        """初始化 CFG 节点。
+
+        - depth: 所在层（0 为根，最大 depth 为终结符层）；
+        - id/name: 节点标识与可读名；
+        - children: 非终结符时，保存可选展开规则。
+        """
         self.config = config
         self.depth = depth
         self.id = id
@@ -27,6 +47,12 @@ class CFG_Node():
         self.children = None
 
     def generate_leaf(self):
+        """生成叶子节点输出。
+
+        返回格式可能是：
+        - [terminal_id]（普通模式）；
+        - [content_token, terminal_id]（内容词表或多词表模式）。
+        """
         if hasattr(self.config,'content_depth'):
             # T symbol ids start from self.vocab_size+4
             return [self.config.content_map[self.id-3-self.config.vocab_size-1][CFG_Config.content_chosen], self.id]
@@ -41,6 +67,7 @@ class CFG_Node():
 
 
     def generate(self, parents=[]):
+        """从当前节点递归采样一条展开结果（含父路径标签）。"""
         random = CFG_Node.rng
         if self.depth==0:
             CFG_Node.nt_counter = [1]*15
@@ -60,6 +87,15 @@ class CFG_Config():
                  disallow_duplicate_sym = False, disallow_duplicate_seq = False, 
                  double_data_layer = None,
                  content_depth = None, content_count = None, content_num_sym = None, multi_vocab = None, add_len_one = False):
+        """
+        构造 CFG 配置对象并设置生成超参数。
+
+        常用参数：
+        - depth/num_sym: CFG 深度与终结符规模；
+        - deg_min/deg_max: 每个 NT 节点候选规则数量范围；
+        - len_min/len_max: 每条规则右侧长度范围；
+        - disallow_duplicate_*: 控制规则去重与符号去重。
+        """
         self.ptb = None
         self.add_len_one = add_len_one
         self.depth = depth
@@ -98,6 +134,7 @@ class CFG_Config():
 
     @staticmethod
     def from_graph(file):
+        """从 JSON 图配置恢复 CFG_Config 实例。"""
         bla = CFG_Config()
         delattr(bla, 'vocab_size')
         delattr(bla, 'sep_token')
@@ -109,6 +146,7 @@ class CFG_Config():
         return bla
 
     def read_graph(self, file):
+        """读取图结构并重建 `self.all` 节点对象。"""
         with open(file, 'r') as openfile:
             dd = json.load(openfile)
         for key in dd.keys():
@@ -129,6 +167,7 @@ class CFG_Config():
             self.vocab_size = self.num_sym
 
     def print_graph(self, file = None, print_to_screen = True):
+        """打印 CFG 规则到屏幕或文件，便于调试和可视化。"""
         if file:
             file = open(file,'w')
         if (not torch.distributed.is_initialized()) or torch.distributed.get_rank() == 0:
@@ -162,6 +201,7 @@ class CFG_Config():
                         print(a)
 
     def build_graph(self):
+        """随机生成一套 CFG 图结构及可选 content/multi_vocab 映射。"""
         self.sizes = [0] * (self.depth+1)
         self.sizes[0] = 1
         if isinstance(self.num_sym_mode, list):
@@ -256,6 +296,7 @@ class CFG_Config():
         #self.print_graph()
 
     def save_graph(self, file):
+        """将当前 CFG 图结构序列化到 JSON 文件。"""
         dd = vars(self)
         for i in range(len(self.all)):
             for j in range(len(self.all[i])):
@@ -265,6 +306,7 @@ class CFG_Config():
             json.dump(dd, outfile)
 
     def generate_onedata(self, rng):
+        """生成一条带层级信息的数据样本（包含 T 与路径辅助信息）。"""
         if self.ptb is not None:
             sentence = self.ptb.generate_sentence(rng)
             b = self.ptb.sentence_to_int(sentence)
@@ -288,6 +330,7 @@ class CFG_Config():
         return output
 
     def generate_onedata_pure(self, rng):
+        """仅返回终结符序列（去除路径与层级附加信息）。"""
         bla = self.generate_onedata(rng)
         return [a[0] for a in bla]
         
@@ -297,6 +340,14 @@ class CFG_Config():
                        cont_sym = None, full_sol = True, kill_front = None, 
                        cascade_count = True, unknown_root = False,
                        double_seq = None):
+        """快速 DP 校验器。
+
+        作用：
+        - 判断序列 `aa` 是否可由当前 CFG 生成；
+        - 返回一种可行解析与可能性计数（若可生成）。
+
+        与慢速版相比，该函数不计算“最小编辑距离”，更适合大规模验证。
+        """
         if self.ptb is not None:
             c = self.ptb.is_in_cfg(aa)
             return c, None, None, None
@@ -532,6 +583,12 @@ class CFG_Config():
                        cont_sym = None, full_sol = True, kill_front = None, 
                        cascade_count = True, unknown_root = False,
                        double_seq = None):
+        """慢速 DP 求解器。
+
+        除可行性外，还会计算：
+        - 使序列满足 CFG 所需的最小 token 修改数；
+        - 对应的一组解析解及各层修改统计。
+        """
         if self.ptb is not None:
             c = self.ptb.is_in_cfg(aa)
             return c, None, None, None
@@ -761,6 +818,11 @@ class CFG_Config():
 
     # DP solver for Non EQ conditional probability per token
     def solve_dp_prob_highprecision(self, aa, debug=True):
+        """高精度 DP 概率求解。
+
+        计算给定前缀下的“下一 token 真实条件分布”，
+        用于评估模型分布（如 KL 散度）而不仅是离散准确率。
+        """
         from decimal import Decimal, getcontext
         getcontext().prec = 100
         getcontext().Emin = -999999
