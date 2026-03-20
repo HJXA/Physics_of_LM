@@ -1,19 +1,20 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
+# 版权声明（c）Meta Platforms, Inc. 及其关联方。
 #
-# Author: Zeyuan Allen-Zhu
+# 作者：Zeyuan Allen-Zhu
 #
 #
-# In this demo 2 we show:
-# 1) how to load a CFG config and visualize it;
-# 2) how to generate a sequence (T symbols) from the CFG;
-# 3) how to compute the ground-truth next-token prediction accuracies based on a valid CFG sequence.
-#    and how to compute the KL divergence between the ground-truth and a model's next-token prediction distribution (softmax logits).
-# 4) how to compute (via SLOW DP) the minimum editing distance (i.e., token change, excluding insertion/deletion) from a valid CFG sequence
-# 5) demonstrate that the FAST DP is simply a weakened version of SLOW DP, without computing minimum editing distance
+# 在本 demo2 中，我们展示：
+# 1) 如何加载 CFG 配置并可视化；
+# 2) 如何从 CFG 生成一条序列（T 符号）；
+# 3) 如何基于合法 CFG 序列计算真实 next-token 预测准确率，
+#    以及如何计算真实分布与模型 next-token 预测分布（softmax 概率）之间的 KL 散度；
+# 4) 如何通过慢速 DP 计算到合法 CFG 序列的最小编辑距离（仅替换 token，不含插入/删除）；
+# 5) 说明快速 DP 本质上是慢速 DP 的弱化版本（不能计算最小编辑距离）。
 #
-# COMMENT: 3) is how we compute entropy / KL-divergence in the Physics of Language Model, Part 1 paper.
-#          4) is not used in the paper, but can help estimate a model's correctness if it fails to generate fully-correct CFG sequence.
-#          5) is identical to demo0, but is given here as a comparison to the SLOW DP.
+# 备注：
+# 3) 对应 Physics of Language Model（Part 1）论文中熵/KL 的计算方式；
+# 4) 虽未在论文中使用，但在模型未生成完全合法 CFG 序列时，可用于估计“离正确答案有多远”；
+# 5) 与 demo0 的快速 DP 相同，此处主要用于和慢速 DP 对照理解。
 # 
 """
 Demo2（高级 DP 分析）
@@ -30,82 +31,84 @@ import random
 import numpy as np
 
 if __name__ == '__main__':
+    # =============================
     # 1) 加载并打印 CFG
-    # Load a config file, say cfg3f.
+    # =============================
+    # 加载配置文件，例如 cfg3f
     config = CFG_Config.from_graph("configs/cfg3f.json")
 
-    # Visualize the CFG rules (for fun)
+    # 打印 CFG 规则，便于人工检查文法结构
     config.print_graph()
 
-    # 2) 生成一条合法终结符序列
-    # Generate a valid sequence
-    rng = random.Random(7711)  # NOT numpy rng
+    # ===========================================
+    # 2) 生成一条合法终结符序列（仅 T 符号）
+    # ===========================================
+    rng = random.Random(7711)  # 注意：这里使用 Python 的 random，而不是 numpy 的随机数
     seq = config.generate_onedata_pure(rng)
     print("This is a generated sequence (without EOS/BOS)", seq)
     # output (from cfg3f) = [3, 3, 3, 3, 1, 1, 2, 1, 3, 1, 2, 3, 2, 2, 1, 2, 3, 3, 1, 2, 1, 3, 1, 2, 1, 2, 1, 2, 2, 1, 2, 2, 1, 3, 3, 2, 2, 1, 3, 3, 1, 1, 2, 1, 1, 2, 1, 3, 2, 3, 3, 3, 1, 2, 1, 2, 1, 2, 3, 3, 1, 3, 3, 1, 3, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 3, 1, 1, 1, 3, 2, 2, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 3, 3, 3, 3, 1, 1, 2, 3, 3, 1, 1, 1, 2, 1, 3, 1, 2, 1, 1, 1, 1, 1, 2, 3, 3, 2, 2, 1, 3, 1, 2, 3, 2, 2, 1, 2, 1, 3, 1, 2, 1, 1, 3, 2, 2, 1, 1, 3, 1, 2, 3, 3, 1, 2, 1, 3, 3, 1, 2, 1, 1, 3, 2, 3, 2, 2, 3, 1, 2, 3, 3, 3, 1, 2, 3, 1, 1, 3, 1, 1, 1, 1, 1, 2, 3, 1, 1, 3, 1, 1, 1, 2, 1, 2, 1, 2, 2, 1, 3, 3, 3, 3, 1, 2, 3, 3, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 3, 1, 2, 1, 1, 1, 1, 1, 2, 1, 3, 2, 2, 1, 1, 1, 2, 1, 1, 2, 3, 1, 1, 3, 3, 1, 3, 1, 1, 3, 1, 1, 1, 2, 1, 1, 1, 3, 2, 2, 2, 2, 1, 1, 1, 3, 3, 3, 1, 1, 3, 1, 1, 1, 1, 3, 1, 1, 3, 1, 1, 1, 2, 1, 3, 2, 2, 2, 1, 1, 2, 1, 2, 1, 1, 3, 1, 1, 1, 2, 1, 1, 2, 2, 1, 3, 1, 2, 3, 1, 1, 1, 1, 1, 1]
     # output (from cfg3k) = [1, 3, 1, 1, 3, 1, 2, 1, 3, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 2, 3, 2, 1, 3, 3, 2, 1, 2, 3, 2, 3, 3, 3, 3, 1, 1, 1, 1, 3, 2, 3, 3, 2, 3, 2, 1, 3, 1, 2, 2, 2, 3, 2, 3, 2, 1, 3, 3, 1, 1, 2, 2, 1, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 2, 3, 1, 3, 1, 2, 1, 1, 3, 1, 3, 3, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 3, 3, 1, 3, 1, 2, 2, 2, 3, 3, 1, 1, 3, 1, 2, 1, 1, 1, 2, 2, 1, 3, 2, 3, 3, 3, 1, 1, 1, 1, 3, 1, 2, 1, 2, 1, 3, 3, 3, 3, 2, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 2, 2, 3, 1, 3, 1, 2, 1, 2, 3, 3, 3, 2, 3, 3, 3, 1, 2, 2, 1, 3, 1, 3, 3, 3, 1, 1, 3, 1, 2, 1, 2, 3, 3, 3, 2, 1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 2, 3, 3, 1, 3, 3, 2, 1, 2, 1, 3, 1, 1, 3, 1, 3, 3, 1, 1, 2, 3, 3, 3, 3, 2, 3, 2, 1, 2, 1, 3, 3, 3, 3, 1, 1, 2, 2, 3, 2, 1, 1, 3, 1, 3, 3, 1, 2, 2, 2, 2, 2, 3, 1, 2, 2, 2, 1, 2, 1, 2, 2, 3, 3, 2, 1, 3, 3, 1, 3, 1, 1, 2, 2, 1, 1, 2, 3, 3, 2, 3, 2, 1, 1, 3, 3, 2, 1, 1, 2, 2, 2, 1, 1, 1, 2, 1, 2, 2, 1, 3, 1, 2, 2, 1, 3, 1, 2, 2, 1, 1, 1, 3, 3, 2, 1, 2, 3, 3, 3, 1, 1, 2, 3, 3, 3, 2, 3, 2, 1, 1, 1, 1, 3, 3, 2, 1, 3, 3, 3, 3, 3, 3, 1, 1, 2, 2, 1, 2, 2, 3, 1, 2, 1, 3, 2, 3, 1, 3, 1, 2, 3, 2, 1, 1, 2, 2, 1, 2, 2, 2, 2, 3, 2, 3, 2, 1, 1, 1, 2, 2, 3, 3, 2, 3, 3, 3, 1, 1, 1, 2, 2, 3, 3, 1, 3, 3, 2, 3, 2, 3, 1, 3, 1, 3, 1, 2, 3, 2, 1, 2, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 2, 3, 3, 3, 2, 2, 3, 2, 3, 3, 3, 2, 1, 1, 3, 1, 2, 1, 3, 3, 2, 1, 2, 3, 2, 3, 2, 1, 1, 3, 1, 1, 3, 1, 3, 3, 3, 3, 1, 2, 2, 3, 3, 1, 2, 2, 3, 1, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 1, 3, 3, 1, 3, 3, 2, 1, 1, 3, 1, 2, 1, 2, 3, 1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 3, 1, 2, 3, 2, 1, 1, 1, 2, 1, 2, 2, 1, 1, 2, 3, 1, 3, 1, 3, 2, 3, 2, 3, 1, 3, 1, 2, 2, 2, 1, 3, 1, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 1, 3, 1, 3, 3, 2, 1, 2, 1, 3, 3, 2, 3, 3, 3, 3, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 2, 2, 1, 1, 2, 1, 3, 3, 1, 3, 1, 3, 2, 3, 1, 3, 1, 3, 1, 1, 3, 1, 1, 3, 3, 3, 3, 2, 3, 3, 3, 3, 3, 3, 1]
 
     ############################################################################################################
-    #  Below are more advanced use cases, don't read unless you want to do more advance analysis
+    #  以下是更高级的用法：如果只想看基础流程，可以先跳过
     ############################################################################################################
 
-    # KL-divergence DP (for evaluating the distribution closeness, in addition to accuracy)
+    # KL 散度相关 DP（除准确率之外，用于评估分布层面的接近程度）
     if True:
-        # 3) 计算真实 next-token 分布（高精度）
-        # Using DP to compute the ground-truth next-token distribution conditioning on the prefix.
-        # WARNING: seq must be a valid sequence for this function call
-        # TIP: I also have a low-precision (faster) function config.solve_dp_prob that will work for cfg3f, 
-        #      but for longer sequences like cfg3k you may want to use config.solve_dp_prob_highprecision
-        target_dist, _ = config.solve_dp_prob_highprecision(seq, debug=False)  # Can turn on debug=True for verbosity to see the DP progress
+        # 3) 基于前缀，使用高精度 DP 计算真实 next-token 条件分布
+        # 警告：该函数要求 seq 是一条“合法 CFG 序列”
+        # 提示：低精度版本 config.solve_dp_prob 速度更快，cfg3f 常可用；
+        #      但对 cfg3k 等更长序列，建议使用 solve_dp_prob_highprecision
+        target_dist, _ = config.solve_dp_prob_highprecision(seq, debug=False)  # 可改为 debug=True 查看 DP 细节日志
         target_dist = np.array(target_dist)
         np.set_printoptions(suppress=True)
         print()
         print(f"Next is the groud-truth next-token distribution conditioning on the prefix. If vocab size |T|=3 then each row has 4 numbers, first is EOS probability); each row sum up to 1.")
         print(target_dist[:20])
 
-        # COMPUTE KL-div(target_dist, your_dist):
-        #    where your_dist is the next-token prediction distribution (i.e., logits) that your language model outputs
-        #    In this example, let us take your_dist = target_dist with some minor changes
+        # 计算 KL(target_dist, your_dist)：
+        #   其中 your_dist 是你的语言模型输出的 next-token 预测分布（例如由 logits 归一化得到）
+        #   这里演示时，先用 target_dist 拷贝一份并做轻微改动
         your_dist = target_dist.copy()
-        your_dist[-1] = [1,0,0,0] # say that your code predicts EOS with 100% probability for the last token
+        your_dist[-1] = [1,0,0,0] # 假设模型在最后一个位置以 100% 概率预测 EOS
         # 4) 计算 KL(target || your)
         epsilon = 1e-5
         target_dist1 = (target_dist + epsilon) / (target_dist + epsilon).sum(axis=1, keepdims=True)
         your_dist1 = (your_dist + epsilon) / (your_dist + epsilon).sum(axis=1, keepdims=True)
         KV_div = np.mean(np.sum(target_dist * (np.log(target_dist1) - np.log(your_dist1)), axis=1))
         print(f"KL-divergence between target_dist and your_dist = {KV_div:.6f}")
-        # output = "KL-divergence between target_dist and your_dist = 0.015178"
+        # 示例输出 = "KL-divergence between target_dist and your_dist = 0.015178"
 
-    # FULL USE of SLOW DP --- config.solve_dp_noneq
+    # 慢速 DP 的完整用法 --- config.solve_dp_noneq
     if False:
-        count, dp_sol, counts, possibility = config.solve_dp_noneq(seq, no_debug=True)   # Can turn on no_debug=False for verbosity to see the DP progress
+        count, dp_sol, counts, possibility = config.solve_dp_noneq(seq, no_debug=True)   # 可改 no_debug=False 查看详细 DP 过程
         print(count, counts, possibility)
-        # output = 0 [0, 0, 0, 0, 0, 0, 0] 1
-        # count = the minimum number of T symbols need to be changed to satisfy the CFG (or count==10000 if no solution)
-        # counts = the number of symbols that need to be changed per CFG level to satisfy the CFG
-        # possibility = the number of different ways to generate this sequence from the given CFG (if it is 1, then the CFG has a unique parsing)
-        # dp_sol = the sequence that satisfies the CFG and is ``closest'' to the given sequence in terms of number of token changes
+        # 示例输出 = 0 [0, 0, 0, 0, 0, 0, 0] 1
+        # count = 为满足 CFG 至少需要修改的 T 符号数（若无解则为 10000）
+        # counts = 每一层级需要修改的符号数
+        # possibility = 在该 CFG 下生成此序列的不同方式数（若为 1，表示解析唯一）
+        # dp_sol = 满足 CFG 且与原序列“修改 token 数最少”的最优序列
 
         seq = [random.randint(1, config.num_sym) for _ in range(len(seq))]
-        count, dp_sol, counts, possibility = config.solve_dp_noneq(seq, no_debug=True)   # Can turn on no_debug=False for verbosity to see the DP progress
+        count, dp_sol, counts, possibility = config.solve_dp_noneq(seq, no_debug=True)   # 可改 no_debug=False 查看详细 DP 过程
         print(count, counts, possibility)
-        # example output (for cfg3f) = 50 [50, 48, 37, 20, 8, 3, 1] 18979019280
-        # This means, from a random sequence of the given length, you need to modify at least 50 symbols (without insert/delte) to make it satisfy the CFG
-        # In this solution, you modify 50 T symbols, 48 NT symbols on the second to last layer, 37 NT symbols on the third to last layer, etc.
-        # The last number 18979019280 is just a rough (since I'm not removing duplicates) estimate for how many possibilities to reach this optimal change 50. 
+        # cfg3f 示例输出 = 50 [50, 48, 37, 20, 8, 3, 1] 18979019280
+        # 含义：对同长度随机序列，至少要修改 50 个符号（不含插入/删除）才能满足 CFG
+        # 其中：T 层修改 50 个，倒数第二层 NT 修改 48 个，倒数第三层 NT 修改 37 个，以此类推
+        # 最后的 18979019280 是达到该最优修改数的方式数粗略估计（未去重）
 
-    # FULL USE of FAST DP --- config.solve_dp_noneq_fast
-    #   (a weaker variant of SLOW DP, can only VERIFY but not to compute the minimum number of changes)
+    # 快速 DP 的完整用法 --- config.solve_dp_noneq_fast
+    #   （慢速 DP 的弱化版：只能“验证是否满足 CFG”，不能求最小修改距离）
     if False:
-        count, dp_sol, _, possibility = config.solve_dp_noneq_fast(seq, no_debug=True)   # Can turn on no_debug=False for verbosity to see the DP progress
+        count, dp_sol, _, possibility = config.solve_dp_noneq_fast(seq, no_debug=True)   # 可改 no_debug=False 查看详细 DP 过程
         print(count, possibility)
-        # output = 0 1
-        # count == 0 means this sequence satisfies the CFG; 10000 means not satisfy CFG
-        # possibility = 1 means this sequence has a unique parsing (i.e., it is the only way to generate this sequence from the given CFG)
+        # 示例输出 = 0 1
+        # count == 0 表示该序列满足 CFG；count == 10000 表示不满足 CFG
+        # possibility = 1 表示该序列解析唯一（在给定 CFG 下只有一种生成方式）
 
         seq[0] = seq[0]%3+1
-        count, dp_sol, _, possibility = config.solve_dp_noneq_fast(seq, no_debug=True)   # Can turn on no_debug=False for verbosity to see the DP progress
+        count, dp_sol, _, possibility = config.solve_dp_noneq_fast(seq, no_debug=True)   # 可改 no_debug=False 查看详细 DP 过程
         print(count, _, possibility)
-        # output = 10000 None
-        # count = 1000 means this sequence does not satisfy the CFG.
+        # 示例输出 = 10000 None
+        # count = 10000 表示该序列不满足 CFG。
 

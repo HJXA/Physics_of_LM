@@ -14,36 +14,60 @@
 """
 Demo1（解析树版）
 
-用途：
-1) 生成终结符序列；
-2) 同时导出对应解析树标签（NT 层信息）；
-3) 使用 DP 验证并回收一组可行解析树。
+这个脚本是一个“从 CFG 采样 + 解析树标注 + DP 验证”的最小闭环示例。
 
-适用于探针任务（probing），因为可直接用 NT 信息作为监督标签。
+核心目标：
+1) 从给定 CFG（上下文无关文法）生成一条终结符序列 seq；
+2) 同步生成该序列对应的一份“逐 token 的树路径标注” seq_tree；
+3) 再用 DP 解析器对 seq 做一次独立验证，得到一组可行解析树 dp_sol。
+
+为什么要做这三步：
+- 对 probing/可解释性任务而言，模型输入是终结符序列（T symbols），
+    但监督标签常来自非终结符层级信息（NT symbols）。
+- `generate_onedata` 给出“生成时的参考树标签”；
+- `solve_dp_noneq_fast` 给出“由文法约束反推的可行树”。
+    如果文法有歧义，两者都可能正确但不完全相同。
+
+主要变量说明：
+- seq: 仅包含终结符 token id 的列表。
+- seq_tree: 与 seq 等长；每个位置包含 [T, idx_T, NT_l1, idx_l1, NT_l2, idx_l2, ...]。
+    其中奇偶位含义见下方注释。
+- correct: DP 验证结果，0 表示可被 CFG 接受，10000 表示不可接受。
+- dp_sol: DP 找到的一组可行解析树（当 correct==0 时非空）。
 """
 
 from data_cfg import CFG_Config
 import random
 
 if __name__ == '__main__':
-    # 1) 加载并打印 CFG
-    # Load a config file, say cfg3k.
-    config = CFG_Config.from_graph("configs/cfg3k.json")
+    # =============================
+    # Step 1) 加载并可视化 CFG
+    # =============================
+    # 从 json 图结构中加载文法配置（例如 cfg3k）
+    config = CFG_Config.from_graph("/ruilab/jxhe/CoE_Monitor/Physics_of_LM/data-synthetic-pretrain/Lano-cfg/configs/cfg3k.json")
 
-    # Visualize the CFG rules (for fun)
+    # 打印文法图（规则、节点关系等），用于肉眼检查文法结构
     config.print_graph()
 
-    # 2) 生成纯终结符序列 + 带树标签序列
+    # =============================================
+    # Step 2) 生成纯序列 seq 与带树标签序列 seq_tree
+    # =============================================
+    # 这里使用相同随机种子，确保两次生成在终结符层面一致：
+    # - generate_onedata_pure: 只返回终结符序列
+    # - generate_onedata: 返回终结符 + 解析树路径标签
     rng = random.Random(7711)  # NOT numpy rng
     seq = config.generate_onedata_pure(rng)
     rng = random.Random(7711)
     seq_tree = config.generate_onedata(rng)
+
+    # 校验：seq_tree 每一项的第 0 个元素就是对应 token 的终结符 id
     assert seq == [seq_tree[i][0] for i in range(len(seq_tree))], "seq_tree[i][0] is exactly the T symbols"
     print("This is a generated sequence (without EOS/BOS)", seq)
     # # output (from cfg3f) = [3, 3, 3, 3, 1, 1, 2, 1, 3, 1, 2, 3, 2, 2, 1, 2, 3, 3, 1, 2, 1, 3, 1, 2, 1, 2, 1, 2, 2, 1, 2, 2, 1, 3, 3, 2, 2, 1, 3, 3, 1, 1, 2, 1, 1, 2, 1, 3, 2, 3, 3, 3, 1, 2, 1, 2, 1, 2, 3, 3, 1, 3, 3, 1, 3, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 3, 1, 1, 1, 3, 2, 2, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 3, 3, 3, 3, 1, 1, 2, 3, 3, 1, 1, 1, 2, 1, 3, 1, 2, 1, 1, 1, 1, 1, 2, 3, 3, 2, 2, 1, 3, 1, 2, 3, 2, 2, 1, 2, 1, 3, 1, 2, 1, 1, 3, 2, 2, 1, 1, 3, 1, 2, 3, 3, 1, 2, 1, 3, 3, 1, 2, 1, 1, 3, 2, 3, 2, 2, 3, 1, 2, 3, 3, 3, 1, 2, 3, 1, 1, 3, 1, 1, 1, 1, 1, 2, 3, 1, 1, 3, 1, 1, 1, 2, 1, 2, 1, 2, 2, 1, 3, 3, 3, 3, 1, 2, 3, 3, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 3, 1, 2, 1, 1, 1, 1, 1, 2, 1, 3, 2, 2, 1, 1, 1, 2, 1, 1, 2, 3, 1, 1, 3, 3, 1, 3, 1, 1, 3, 1, 1, 1, 2, 1, 1, 1, 3, 2, 2, 2, 2, 1, 1, 1, 3, 3, 3, 1, 1, 3, 1, 1, 1, 1, 3, 1, 1, 3, 1, 1, 1, 2, 1, 3, 2, 2, 2, 1, 1, 2, 1, 2, 1, 1, 3, 1, 1, 1, 2, 1, 1, 2, 2, 1, 3, 1, 2, 3, 1, 1, 1, 1, 1, 1]
     # # output (from cfg3k) = [1, 3, 1, 1, 3, 1, 2, 1, 3, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 2, 3, 2, 1, 3, 3, 2, 1, 2, 3, 2, 3, 3, 3, 3, 1, 1, 1, 1, 3, 2, 3, 3, 2, 3, 2, 1, 3, 1, 2, 2, 2, 3, 2, 3, 2, 1, 3, 3, 1, 1, 2, 2, 1, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 2, 3, 1, 3, 1, 2, 1, 1, 3, 1, 3, 3, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 3, 3, 1, 3, 1, 2, 2, 2, 3, 3, 1, 1, 3, 1, 2, 1, 1, 1, 2, 2, 1, 3, 2, 3, 3, 3, 1, 1, 1, 1, 3, 1, 2, 1, 2, 1, 3, 3, 3, 3, 2, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 2, 2, 3, 1, 3, 1, 2, 1, 2, 3, 3, 3, 2, 3, 3, 3, 1, 2, 2, 1, 3, 1, 3, 3, 3, 1, 1, 3, 1, 2, 1, 2, 3, 3, 3, 2, 1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 2, 3, 3, 1, 3, 3, 2, 1, 2, 1, 3, 1, 1, 3, 1, 3, 3, 1, 1, 2, 3, 3, 3, 3, 2, 3, 2, 1, 2, 1, 3, 3, 3, 3, 1, 1, 2, 2, 3, 2, 1, 1, 3, 1, 3, 3, 1, 2, 2, 2, 2, 2, 3, 1, 2, 2, 2, 1, 2, 1, 2, 2, 3, 3, 2, 1, 3, 3, 1, 3, 1, 1, 2, 2, 1, 1, 2, 3, 3, 2, 3, 2, 1, 1, 3, 3, 2, 1, 1, 2, 2, 2, 1, 1, 1, 2, 1, 2, 2, 1, 3, 1, 2, 2, 1, 3, 1, 2, 2, 1, 1, 1, 3, 3, 2, 1, 2, 3, 3, 3, 1, 1, 2, 3, 3, 3, 2, 3, 2, 1, 1, 1, 1, 3, 3, 2, 1, 3, 3, 3, 3, 3, 3, 1, 1, 2, 2, 1, 2, 2, 3, 1, 2, 1, 3, 2, 3, 1, 3, 1, 2, 3, 2, 1, 1, 2, 2, 1, 2, 2, 2, 2, 3, 2, 3, 2, 1, 1, 1, 2, 2, 3, 3, 2, 3, 3, 3, 1, 1, 1, 2, 2, 3, 3, 1, 3, 3, 2, 3, 2, 3, 1, 3, 1, 3, 1, 2, 3, 2, 1, 2, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 2, 3, 3, 3, 2, 2, 3, 2, 3, 3, 3, 2, 1, 1, 3, 1, 2, 1, 3, 3, 2, 1, 2, 3, 2, 3, 2, 1, 1, 3, 1, 1, 3, 1, 3, 3, 3, 3, 1, 2, 2, 3, 3, 1, 2, 2, 3, 1, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 1, 3, 3, 1, 3, 3, 2, 1, 1, 3, 1, 2, 1, 2, 3, 1, 1, 2, 1, 2, 2, 1, 2, 2, 1, 3, 1, 2, 3, 2, 1, 1, 1, 2, 1, 2, 2, 1, 1, 2, 3, 1, 3, 1, 3, 2, 3, 2, 3, 1, 3, 1, 2, 2, 2, 1, 3, 1, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 1, 3, 1, 3, 3, 2, 1, 2, 1, 3, 3, 2, 3, 3, 3, 3, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 2, 2, 1, 1, 2, 1, 3, 3, 1, 3, 1, 3, 2, 3, 1, 3, 1, 3, 1, 1, 3, 1, 1, 3, 3, 3, 3, 2, 3, 3, 3, 3, 3, 3, 1]
 
     print("This is a generated sequence with parsing tree (T and NT symbols)", seq_tree)
+    # 只打印前 20 个位置，避免输出过长
     for i in range(20):
         print(seq_tree[i])
 
@@ -69,30 +93,52 @@ if __name__ == '__main__':
     # [1, -20, 9, -9, 12, -4, 13, -3, 18, -2, 20, -2, 24, -2, 25, -2]
     # [1, -21, 9, -9, 12, -4, 13, -3, 18, -2, 20, -2, 24, -2, 25, -2]
 
-    # The (positive) numbers at odd positions represent the T/NT symbols at different levels (from leave to root)
-    #  E.g., the 1-st  token has T=1 and NT=(7, 11, 15, 18, 20, 24, 25)
-    #  E.g., the 11-th token has T=1 and NT=(8, 12, 15, 18, 20, 24, 25)
-    # IMPORTANT: those NT symbols are NOT sufficient in recoverring the parsing tree,
-    #            because for instance when 12 -> 8 8 7, one needs to differentiate the two NT symbol 8's.
-
-    # The (negative) numbers at even positions represent the indices of the T/NT symbols in the sequence.
-    # Formally, if seq_tree[i][2*j+1]==-1-k (for k>=1) then it means the T/NT symbol seq_tree[i][2*j] is the k-th T/NT symbol at level j
-    #  E.g., seq_tree[i][1]==-2-i because the T symbol at position i is always the i-th T symbol at level 0.
-    #  E.g., seq_tree[i][3]==(-2,-2,-2,-3,-3,-3,-4,-4,-5,-5,....) means that the NT symbols at level 1 are (NT=7, NT=7, NT=7, NT=8) but each spans 3, 3, 2, 2 tokens respectively.
+    # seq_tree[i] 的结构可以理解为“从叶子到根的一条路径（交替记录符号与其序号）”
     #
-    # Lemma (trivial): from seq_tree one can recover the parsing tree by simply grouping the T/NT symbols according to their levels.
+    # 其中：
+    # - 偶数下标（0,2,4,...）存储符号 id（T/NT，通常为正数）
+    # - 奇数下标（1,3,5,...）存储该层符号在该层序列中的位置索引编码（通常为负数）
+    #
+    # 注：代码注释里把“odd positions”称为符号位，这里的“odd/even”是按人类从 1 开始计数；
+    # Python 下标从 0 开始时，对应关系会反过来，请以具体索引位解释为准。
 
-    # Part 1 of our paper shows that:
-    #  1) the NT symbols (odd ppositions) are stored in the last transformer layer --- up to linear transformation (linear probing)
-    #  2) the NT boundary information (i.e., those i with seq_tree[i][2*j+1] != seq_tree[i+1][2*j+1]) are also stored in the last transformer layer
 
-    # 3) 用快速 DP 校验可行性，并获得一组可行解析
+    # 奇数位置上的（正）数表示不同层级（从叶节点到根节点）的T/NT符号
+    # 例如，第1个标记的T=1，NT=(7, 11, 15, 18, 20, 24, 25)
+    # 例如，第11个标记的T=1，NT=(8, 12, 15, 18, 20, 24, 25)
+    # 重要提示：这些NT符号不足以恢复解析树，
+    # 因为例如当12 -> 8 8 7时，需要区分两个NT符号8。
+
+    # 偶数位置上的（负）数表示序列中T/NT符号的索引。
+    # 形式上，如果seq_tree[i][2*j+1]==-1-k（其中k>=1），则表示seq_tree[i][2*j]的T/NT符号是第j层级上的第k个T/NT符号
+    # 例如，seq_tree[i][1]==-2-i，因为位置i处的T符号始终是第0层级上的第i个T符号。
+    # 例如，seq_tree[i][3]==(-2,-2,-2,-3,-3,-3,-4,-4,-5,-5,....)表示第1层级上的NT符号为(NT=7, NT=7, NT=7, NT=8)，但每个符号分别跨越3、3、2、2个标记。
+    #
+    # （平凡）引理：通过简单地按照层级对T/NT符号进行分组，就可以从seq_tree恢复解析树。
+
+    # 我们论文的第1部分表明：
+    # 1）NT符号（奇数位置）存储在最后一个Transformer层中——直至线性变换（线性探测）
+    # 2）NT边界信息（即那些seq_tree[i][2*j+1] != seq_tree[i+1][2*j+1]的i）也存储在最后一个Transformer层中
+
+    # ======================================
+    # Step 3) 用快速 DP 校验并回收可行解析
+    # ======================================
+    # 对“生成出来的 seq”再跑一遍独立 DP 解析：
+    # - 若能被 CFG 接受，则 correct==0 且返回一组解析 dp_sol；
+    # - 若不能被 CFG 接受，则 correct==10000 且 dp_sol 为 None。
     correct, dp_sol, _, _ = config.solve_dp_noneq_fast(seq, no_debug=True) 
     # As we saw in demo0, correct = 0 or 10000 indicating if seq satisfies the CFG (0 for yes, 10000 for no)
     # Additionally, dp_sol is a valid parsing tree (if correct == 0) or None (if correct == 10000).
+
+    # 因为 seq 是由同一 CFG 直接采样得到，理论上一定可解析；这里用 assert 做一致性保护
     assert correct==0, f"Generated sequence {seq} must satisfy the CFG."
+    # 这是生成序列的有效解析树（非终结符符号）：
     print("This is a valid parsing tree (NT symbols) for the generated sequence:")
     for i in range(20):
         print(dp_sol[i])
+
+    # 说明：
+    # - 若文法无歧义，通常 dp_sol 与 seq_tree 的树结构会一致（或高度接近）；
+    # - 若文法有歧义，它们可能不同，但都能合法生成同一个终结符序列 seq。
     # It could be that dp_sol == seq_tree, but if the CFG is ambiguous, then dp_sol could be different from seq_tree.
 

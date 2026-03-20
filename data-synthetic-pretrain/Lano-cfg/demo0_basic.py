@@ -23,7 +23,7 @@ import random
 if __name__ == '__main__':
     # 1) 加载 CFG 配置
     # Load a config file, say cfg3k.
-    config = CFG_Config.from_graph("configs/cfg3k.json")
+    config = CFG_Config.from_graph("/ruilab/jxhe/CoE_Monitor/Physics_of_LM/data-synthetic-pretrain/Lano-cfg/configs/cfg3k.json")
 
     # 2) 打印规则结构（可选）
     # Visualize the CFG rules (for fun)
@@ -42,6 +42,7 @@ if __name__ == '__main__':
     correct, _, _, _ = config.solve_dp_noneq_fast(seq, no_debug=True) 
     # correct = 0 or 10000, if 0 means the sequence satisfies the CFG, if 10000 means it does not
     assert correct==0, f"Generated sequence {seq} must satisfy the CFG."
+    print(correct)   # most likely output = 0, meaning satisfies the CFG
 
     # 5) 对序列做扰动后再次校验
     # !!! TL;DR - verification2 (DP could take a few seconds for cfg3f, or <=30 seconds for cfg3k) !!!
