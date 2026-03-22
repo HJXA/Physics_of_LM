@@ -181,13 +181,13 @@ def merge_parquet_files(src_dir, dest_file):
 def main():
     parser = argparse.ArgumentParser(description="生成 CFG Dataset 并保存为 Parquet 格式")
     parser.add_argument("--config_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/data-synthetic-pretrain/Lano-cfg/configs/cfg3f.json", help="使用的 CFG 规则配置文件")
-    parser.add_argument("--save_dir", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/data-synthetic-pretrain/Lano-cfg/datasets", help="数据的输出保护路径")
+    parser.add_argument("--save_dir", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets", help="数据的输出保护路径")
     parser.add_argument("--model_path", type=str, default="/ruilab/jxhe/CoE_Monitor/checkpoints/GPT_2_Small", help="模型路径，用于获取bos和eos")
     
     # 论文中无限数据范式相当于使用全量随机构造。1亿 token 大约对应约 195,000 个长度为 512 的 sequence chunks。
     # 您可按需扩展为 49亿 tokens 对应的预训练上限 (~9,500,000 chunks)
-    parser.add_argument("--train_chunks", type=int, default=10000000, help="训练集序列总块数 (窗口大小为 512)") # 10000000
-    parser.add_argument("--test_samples", type=int, default=20000, help="测试集独立序列样本数") # 20000
+    parser.add_argument("--train_chunks", type=int, default=20000000, help="训练集序列总块数 (窗口大小为 512)")
+    parser.add_argument("--test_samples", type=int, default=40000, help="测试集独立序列样本数") 
     parser.add_argument("--chunk_size", type=int, default=512, help="固定窗口长度，论文中设为 512") # 
     parser.add_argument("--num_workers", type=int, default=16, help="并行生成的进程数量")
     
@@ -196,17 +196,17 @@ def main():
     os.makedirs(args.save_dir, exist_ok=True)
     
     # 0. 读取模型 config 获取 bos_token_id 和 eos_token_id
-    import json
-    model_config_path = os.path.join(args.model_path, "config.json")
-    if os.path.exists(model_config_path):
-        with open(model_config_path, "r", encoding="utf-8") as f:
-            model_config = json.load(f)
-        bos_token_id = model_config.get("bos_token_id", 0)
-        eos_token_id = model_config.get("eos_token_id", 0)
-    else:
-        print(f"警告：模型配置文件未找到 {model_config_path}。使用默认值。")
-        bos_token_id = 0
-        eos_token_id = 0
+    # import json
+    # model_config_path = os.path.join(args.model_path, "config.json")
+    # if os.path.exists(model_config_path):
+    #     with open(model_config_path, "r", encoding="utf-8") as f:
+    #         model_config = json.load(f)
+    #     bos_token_id = model_config.get("bos_token_id", 0)
+    #     eos_token_id = model_config.get("eos_token_id", 0)
+    # else:
+    #     print(f"警告：模型配置文件未找到 {model_config_path}。使用默认值。")
+    #     bos_token_id = 0
+    #     eos_token_id = 0
 
     # GPT-2的EOS和BOS一样，所以我们先指定0为BOS，4为EOS (其余的符号均是1，2，3)
     bos_token_id = 100
