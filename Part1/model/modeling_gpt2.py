@@ -482,6 +482,8 @@ class GPT2Model(GPT2PreTrainedModel):
         if attention_mask is not None and attention_mask.ndim < 4:
             attention_mask = attention_mask.view(batch_size, -1)
 
+        # 关键点：即使外部只传了 2D padding attention_mask，这里也会在内部构造因果 mask（下三角）
+        # 并与 padding 信息融合，得到最终用于注意力计算的 4D 掩码。
         causal_mask = create_causal_mask(
             config=self.config,
             inputs_embeds=inputs_embeds,
@@ -513,7 +515,7 @@ class GPT2Model(GPT2PreTrainedModel):
                 hidden_states,
                 past_key_values if not (self.gradient_checkpointing and self.training) else None,
                 cache_position,
-                causal_mask,
+                causal_mask,  # 这里把“内部生成好的因果+padding联合mask”传给每一层 block.attn
                 encoder_hidden_states,  # as a positional argument for gradient checkpointing
                 encoder_attention_mask=encoder_attention_mask,
                 use_cache=use_cache,

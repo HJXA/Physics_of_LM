@@ -7,11 +7,11 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 from transformers import AutoConfig, AutoModelForCausalLM
-from modeling_gpt2_variants import CustomGPT2LMHeadModel
+from modeling_gpt2_variants import CustomGPT2LMHeadModel,GPT2Config
 
 # 指向您基于标准的模型配置路径，以保留特定的 Vocab Size & Pad TokenID 设置
 BASE_CONFIG_PATH = "/ruilab/jxhe/CoE_Monitor/checkpoints/GPT_2_Small"
-SAVE_BASE_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/GPT_2_Init"
+SAVE_BASE_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_2_Init"
 
 def compare_standard_with_base():
     print("=" * 50)
@@ -66,14 +66,15 @@ def compare_standard_with_base():
 def init_all_variants():
     # 读入基础模型的配置
     try:
-        config = AutoConfig.from_pretrained(BASE_CONFIG_PATH)
+        config = GPT2Config.from_pretrained(BASE_CONFIG_PATH)
+        config.vocab_size = 6  # 强制设置 vocab_size=6 来匹配我们 CFG 数据集的特殊需求
     except Exception as e:
         print(f"Error loading config from {BASE_CONFIG_PATH}: {e}")
         print("请检查基础路径是否正确且含有 config.json 文件。")
         return
 
     # 涵盖所有的指定模型变体
-    variants = ['standard', 'rot', 'rel', 'pos', 'uni']
+    variants = ['standard','rot', 'rel', 'pos', 'uni']
     
     for v_type in variants:
         print("=" * 50)
@@ -87,7 +88,7 @@ def init_all_variants():
         print(f"可训练参数量: {params}")
         
         # 建立保存的文件夹并落地模型文件
-        save_path = os.path.join(SAVE_BASE_DIR, f"GPT_2_{v_type}")
+        save_path = os.path.join(SAVE_BASE_DIR, f"gpt_2_{v_type}")
         os.makedirs(save_path, exist_ok=True)
         
         # 导出为通用的预训练格式 (.bin / .safetensors 和 config.json)

@@ -169,11 +169,20 @@ class SwanLabTrainer(Trainer):
         # labels = inputs.get("labels")
 
         self.step_count += 1
+        
+        # 当正在进行梯度累加且不是最后一次反向传播前向时，直接调用父类方法，跳过所有额外计算以提升速度
+        if self.args.gradient_accumulation_steps > 1 and self.step_count % self.args.gradient_accumulation_steps != 0:
+            return super().compute_loss(model, inputs, return_outputs=return_outputs, num_items_in_batch=num_items_in_batch)
+
+        # 针对当前步计算实际更新后的真实 Global Step
+        real_global_step = self.step_count // self.args.gradient_accumulation_steps
+
+        # ==================== 下面是真正的更新步或无梯度累加才会进入的代码 ====================
 
 
         if self.test_falg and self.rank==0:
             print("============测试模式=============")
-            if self.step_count == 1:
+            if real_global_step == 1:
                 self.input = inputs 
                 print("input_ids.shape:", inputs['input_ids'].shape)
                 print("input的labels.shape:", inputs['labels'].shape)
@@ -275,6 +284,16 @@ class SwanLabTrainer(Trainer):
 
         # CoE
 
+        if real_global_step == 1 and self.rank == 0:
+            print(f"=== Step {real_global_step} ===")
+            print("模型输出 keys:", outputs.keys())
+            if hasattr(outputs, "logits"):
+                print("logits shape:", outputs.logits.shape)
+            else:
+                print("Warning: outputs 中没有 logits 字段，无法打印形状。")
+
+            print("loss:", loss.item())
+
         if self.test_falg and self.rank==0:
             torch.cuda.synchronize()
             print("raw_compute_loss",time.time()-comput_loss_start)
@@ -282,15 +301,12 @@ class SwanLabTrainer(Trainer):
             print("labels 的形状",current_labels.shape)
             print(f"labels 中 -100 比例",(current_labels == -100).float().mean())
 
-        if not self.CoE_Flag:
-            return (loss, outputs) if return_outputs else loss
-
 
     
 
         
 
-        layer_hidden_state = Layer_Hidden_Train(outputs.hidden_states, labels = current_labels,eos_token_id=getattr(self.model.config, 'eos_token_id', None),pad_token_id=getattr(self.model.config, 'pad_token_id', None), steps = self.step_count, rank = self.accelerator.process_index, input_ids = inputs.get('input_ids'),train_type=self.train_type)
+        layer_hidden_state = Layer_Hidden_Train(outputs.hidden_states, labels = current_labels,eos_token_id=getattr(self.model.config, 'eos_token_id', None),pad_token_id=getattr(self.model.config, 'pad_token_id', None), steps = real_global_step, rank = self.accelerator.process_index, input_ids = inputs.get('input_ids'),train_type=self.train_type)
         # (Batch_Real, Layer, Hidden_Dim)
         if layer_hidden_state is not None:
 
@@ -306,7 +322,7 @@ class SwanLabTrainer(Trainer):
 
             save_path = os.path.join(
                 self.save_layer_hidden_root,
-                f"Step{self.step_count}_Rank{self.rank}.pt"
+                f"Step{real_global_step}_Rank{self.rank}.pt"
             )
 
             tensor_to_save = (
@@ -315,7 +331,7 @@ class SwanLabTrainer(Trainer):
                 .to(torch.bfloat16)   # 强烈建议压缩
                 .cpu()
             )
-            if self.step_count == 1 and self.rank == 0:
+            if real_global_step == 1 and self.rank == 0:
                 print(f"准备保存 Layer Hidden State: {tensor_to_save.shape}, layer_hidden_state 原始形状: {layer_hidden_state.shape}")
 
             
@@ -345,7 +361,7 @@ class SwanLabTrainer(Trainer):
             }
 
             if self.rank == 0:
-                swanlab.log(metrics, step=self.step_count)
+                swanlab.log(metrics, step=real_global_step)
 
             layer_hidden_state = None  # 释放内存
 
@@ -353,7 +369,7 @@ class SwanLabTrainer(Trainer):
                 torch.cuda.synchronize()
                 print("coe_add",time.time()-coe_start)
         else:
-            print(f"Step {self.step_count} Rank {self.rank}: Layer_Hidden_Train 返回 None，未保存 Layer Hidden State 也未计算 CoE 指标。")
+            print(f"Step {real_global_step} Rank {self.rank}: Layer_Hidden_Train 返回 None，未保存 Layer Hidden State 也未计算 CoE 指标。")
 
 
         # ==============================================================================
@@ -371,6 +387,10 @@ class SwanLabTrainer(Trainer):
             
             # 预测类别
             preds = shift_logits.argmax(dim=-1)
+
+            if self.test_falg and self.rank==0:
+                print("shift_labels:", shift_labels.tolist())
+                print("preds:", preds.tolist())
             
             # 去除 padding (通常为 -100) 的影响
             valid_mask = (shift_labels != -100)
@@ -389,7 +409,7 @@ class SwanLabTrainer(Trainer):
             swanlab.log({
                 "loss": loss.item(), 
                 "acc": acc
-            }, step=self.step_count)
+            }, step=real_global_step)
 
         return (loss, outputs) if return_outputs else loss
     

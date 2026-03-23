@@ -1,5 +1,6 @@
 import os 
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"  # 请根据实际情况调整 GPU 可见性
+# export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 import logging
 from typing import Dict, List
 
@@ -12,7 +13,7 @@ from transformers import (
 )
 import sys
 sys.path.append("/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/model")
-from modeling_gpt2_variants import CustomGPT2LMHeadModel
+from modeling_gpt2_variants import CustomGPT2LMHeadModel, GPT2Config
 from SwanLabTrainer import SwanLabTrainer
 import torch
 
@@ -22,12 +23,12 @@ IS_TEST = False
 # ============================================================
 # Block 1: 配置路径与按论文要求的超参
 # ============================================================
-MODEL_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/GPT_2_Init/GPT_2_standard" # 请在这里指向您初始化的GPT模型
+MODEL_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_2_Init/gpt_2_rot" # 请在这里指向您初始化的GPT模型
 TRAIN_FROM_SCRATCH = False # 开启后将随机初始化模型权重, 我现在是提前Init了所以不用开
 GPT_VARIANT_TYPE = MODEL_PATH.split("/")[-1].split("_")[-1] # 要训练的 GPT 变体类型 ('standard', 'rot', 'rel', 'pos', 'uni')
 print(f"准备训练 GPT: [{GPT_VARIANT_TYPE}] | 模型路径: {MODEL_PATH}")
-TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/train.parquet"
-OUTPUT_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt2_pretrain"
+TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/512_Padding/train.parquet"
+OUTPUT_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/" + f"gpt_{GPT_VARIANT_TYPE}_Pretrain" # 模型输出目录
 
 # 按论文 GPT 预训练指定的超参配置
 SEED = 42
@@ -54,8 +55,8 @@ FP16 = False
 
 if IS_TEST:
 	# 测试模式下缩短训练以验证流程正确性
-	MAX_STEPS = 10
-	SAVE_STEPS = 3
+	MAX_STEPS = 100
+	SAVE_STEPS = 30
 	PER_DEVICE_TRAIN_BATCH_SIZE = 2
 	OUTPUT_DIR += "_test"
 
@@ -67,8 +68,7 @@ def build_causal_lm_collator(pad_token_id: int):
 	{
 		'input_ids': [...],
 		'labels': [...],
-		'length': ...,
-		'lengths': [...]
+		'attention_mask': [...],
 	}
 	"""
 
@@ -111,7 +111,7 @@ def main():
 	# ============================================================
 	# Block 3: 加载模型
 	# ============================================================
-	attn_impl = "flash_attention_2" if GPT_VARIANT_TYPE == 'standard' else "eager"
+	attn_impl = "flash_attention_2" if GPT_VARIANT_TYPE in ['standard','rot'] else "eager"
 
 	if TRAIN_FROM_SCRATCH:
 		print(f"Initialize {GPT_VARIANT_TYPE} model from scratch using config from: {MODEL_PATH} with {attn_impl}")
@@ -125,12 +125,12 @@ def main():
 			MODEL_PATH,
 			gpt_type=GPT_VARIANT_TYPE,
 			attn_implementation=attn_impl,
-			torch_dtype=torch.bfloat16
+			dtype=torch.bfloat16
 		)
 	# 显式设定我们的 pad_token_id，因为生成的 CFG 数据中 eos 是 101
-	model.config.bos_token_id = 100 # 开始
-	pad_token_id = model.config.bos_token_id
-	model.config.eos_token_id = 101 # 结束
+	model.config.bos_token_id = 0 # 开始
+	pad_token_id = 5
+	model.config.eos_token_id = 4 # 结束
 
 	# ============================================================
 	# Block 4: 读取 parquet 训练集（已tokenized）
@@ -149,6 +149,24 @@ def main():
 
 	data_collator = build_causal_lm_collator(pad_token_id=pad_token_id)
 
+	# 训练开始前，打印经过 data_collator 处理后的样本示例
+	if len(train_dataset) > 0:
+		preview_n = min(2, len(train_dataset))
+		preview_features = [train_dataset[i] for i in range(preview_n)]
+		preview_batch = data_collator(preview_features)
+
+		print("\n[Collator Preview]")
+		print(
+			f"input_ids shape: {tuple(preview_batch['input_ids'].shape)}, "
+			f"labels shape: {tuple(preview_batch['labels'].shape)}, "
+			f"attention_mask shape: {tuple(preview_batch['attention_mask'].shape)}"
+		)
+		print(f"input_ids[0]: {preview_batch['input_ids'][0].tolist()}")
+		print(f"labels[0]: {preview_batch['labels'][0].tolist()}")
+		print(f"attention_mask[0]: {preview_batch['attention_mask'][0].tolist()}")
+	else:
+		print("[Collator Preview] 训练集为空，请检查 train.parquet")
+
 	# ============================================================
 	# Block 5: 根据论文修改后的严谨训练参数
 	# ============================================================
@@ -164,9 +182,10 @@ def main():
 		adam_beta2=ADAM_BETA2,
 		lr_scheduler_type=LR_SCHEDULER_TYPE,
 		per_device_train_batch_size=PER_DEVICE_TRAIN_BATCH_SIZE,
-		# gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
+		gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
 		logging_steps=LOGGING_STEPS,
 		save_steps=SAVE_STEPS,
+		gradient_checkpointing=True, # 开启梯度检查点以节省显存
 		# save_total_limit=SAVE_TOTAL_LIMIT,
 		bf16=BF16,
 		fp16=FP16,
@@ -185,7 +204,7 @@ def main():
 		train_dataset=train_dataset,
 		data_collator=data_collator,
 		swanlab_project="CFG_Pretrain",
-		swanlab_experiment_name="gpt2_cfg_pretrain",
+		swanlab_experiment_name=f"gpt2_{GPT_VARIANT_TYPE}_pretrain",
 		swanlab_description="Pretraining GPT on synthetic CFG dataset",
 		test_falg=IS_TEST,
 		CoE_Flag=True,

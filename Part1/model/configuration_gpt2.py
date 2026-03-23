@@ -183,6 +183,7 @@ class GPT2Config(PreTrainedConfig):
         self.use_cache = use_cache
         self.scale_attn_by_inverse_layer_idx = scale_attn_by_inverse_layer_idx
         self.reorder_and_upcast_attn = reorder_and_upcast_attn
+        self.rope_parameters = None
 
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
