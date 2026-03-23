@@ -181,7 +181,7 @@ def merge_parquet_files(src_dir, dest_file):
 def main():
     parser = argparse.ArgumentParser(description="生成 CFG Dataset 并保存为 Parquet 格式")
     parser.add_argument("--config_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/data-synthetic-pretrain/Lano-cfg/configs/cfg3f.json", help="使用的 CFG 规则配置文件")
-    parser.add_argument("--save_dir", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets", help="数据的输出保护路径")
+    parser.add_argument("--save_dir", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/512_Chunk", help="数据的输出保护路径")
     parser.add_argument("--model_path", type=str, default="/ruilab/jxhe/CoE_Monitor/checkpoints/GPT_2_Small", help="模型路径，用于获取bos和eos")
     
     # 论文中无限数据范式相当于使用全量随机构造。1亿 token 大约对应约 195,000 个长度为 512 的 sequence chunks。
@@ -199,6 +199,7 @@ def main():
     # GPT-2的EOS和BOS一样，所以我们先指定0为BOS，4为EOS (其余的符号均是1，2，3)
     bos_token_id = 0
     eos_token_id = 4
+    pad_token_id = 5  # GPT-2没有专门的PAD token，我们可以用BOS token来填充
     print(f"bos_token_id: {bos_token_id}, eos_token_id: {eos_token_id}")
 
     # 1. 加载 CFG 规则

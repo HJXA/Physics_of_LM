@@ -175,17 +175,18 @@ class SwanLabTrainer(Trainer):
             return super().compute_loss(model, inputs, return_outputs=return_outputs, num_items_in_batch=num_items_in_batch)
 
         # 针对当前步计算实际更新后的真实 Global Step
-        real_global_step = self.step_count // self.args.gradient_accumulation_steps
+        real_global_step = int(self.step_count // self.args.gradient_accumulation_steps)
 
         # ==================== 下面是真正的更新步或无梯度累加才会进入的代码 ====================
+
+        if real_global_step == 1 and self.rank == 0:
+            print("input_ids.shape:", inputs['input_ids'].shape)
+            print("input的labels.shape:", inputs['labels'].shape)
 
 
         if self.test_falg and self.rank==0:
             print("============测试模式=============")
-            if real_global_step == 1:
-                self.input = inputs 
-                print("input_ids.shape:", inputs['input_ids'].shape)
-                print("input的labels.shape:", inputs['labels'].shape)
+            if real_global_step == 1 and self.rank == 0:
                 print("input_ids:", inputs['input_ids'].tolist())
                 # print("labels:", inputs['labels'].tolist())
             torch.cuda.synchronize()

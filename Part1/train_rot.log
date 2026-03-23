@@ -14,3 +14,37 @@ swanlab: 🏠 View project at https://swanlab.cn/@HXJA/CFG_Pretrain
 swanlab: 🚀 View run at https://swanlab.cn/@HXJA/CFG_Pretrain/runs/ehrseii64x1kpuxjfesm3
 [CoeTrainer] args 中未设置 resume_from_checkpoint，无法加载 CoE 状态。
 [CoeTrainer] Rank 0 初始化完成
+=== Step 1 ===
+模型输出 keys: odict_keys(['loss', 'logits', 'hidden_states'])
+logits shape: torch.Size([96, 512, 6])
+loss: 1.7628644704818726
+hidden_states.len == Layer_Num ==  13
+labels 中 -100 比例 tensor(0.4939, device='cuda:0')
+Packed 模式条件不满足: Batch=96, SeqLen=512, Labels_Shape=torch.Size([96, 512]), EOS_Token_ID=4
+[普通模式] PoL PT模式,使用全量掩码。
+准备保存 Layer Hidden State: torch.Size([10, 13, 768]), layer_hidden_state 原始形状: torch.Size([96, 13, 768])
+{'loss': '1.199', 'grad_norm': '0.3613', 'learning_rate': '0.0002997', 'epoch': '0.00048'}
+{'loss': '1.098', 'grad_norm': '1.273', 'learning_rate': '0.0002994', 'epoch': '0.00096'}
+{'loss': '1.072', 'grad_norm': '0.7734', 'learning_rate': '0.0002991', 'epoch': '0.00144'}
+{'loss': '0.996', 'grad_norm': '0.6406', 'learning_rate': '0.0002988', 'epoch': '0.00192'}
+{'loss': '0.9054', 'grad_norm': '0.6133', 'learning_rate': '0.0002985', 'epoch': '0.0024'}
+{'loss': '0.8814', 'grad_norm': '0.2988', 'learning_rate': '0.0002982', 'epoch': '0.00288'}
+{'loss': '0.8688', 'grad_norm': '1.414', 'learning_rate': '0.0002979', 'epoch': '0.00336'}
+{'loss': '0.8645', 'grad_norm': '0.8594', 'learning_rate': '0.0002976', 'epoch': '0.00384'}
+{'loss': '0.8567', 'grad_norm': '1.219', 'learning_rate': '0.0002973', 'epoch': '0.00432'}
+{'loss': '0.8512', 'grad_norm': '0.4121', 'learning_rate': '0.000297', 'epoch': '0.0048'}
+{'loss': '0.8438', 'grad_norm': '0.5586', 'learning_rate': '0.0002967', 'epoch': '0.00528'}
+{'loss': '0.8411', 'grad_norm': '0.2988', 'learning_rate': '0.0002964', 'epoch': '0.00576'}
+{'loss': '0.8351', 'grad_norm': '0.2617', 'learning_rate': '0.0002961', 'epoch': '0.00624'}
+{'loss': '0.8326', 'grad_norm': '1.148', 'learning_rate': '0.0002958', 'epoch': '0.00672'}
+{'loss': '0.8285', 'grad_norm': '1.289', 'learning_rate': '0.0002955', 'epoch': '0.0072'}
+{'loss': '0.8255', 'grad_norm': '0.3242', 'learning_rate': '0.0002952', 'epoch': '0.00768'}
+{'loss': '0.8226', 'grad_norm': '0.3809', 'learning_rate': '0.0002949', 'epoch': '0.00816'}
+{'loss': '0.8197', 'grad_norm': '0.2832', 'learning_rate': '0.0002946', 'epoch': '0.00864'}
+{'loss': '0.8165', 'grad_norm': '0.5039', 'learning_rate': '0.0002943', 'epoch': '0.00912'}
+{'loss': '0.8134', 'grad_norm': '0.2354', 'learning_rate': '0.000294', 'epoch': '0.0096'}
+{'loss': '0.8114', 'grad_norm': '0.5273', 'learning_rate': '0.0002937', 'epoch': '0.01008'}
+{'loss': '0.8084', 'grad_norm': '0.5195', 'learning_rate': '0.0002934', 'epoch': '0.01056'}
+{'loss': '0.8074', 'grad_norm': '0.9414', 'learning_rate': '0.0002931', 'epoch': '0.01104'}
+{'loss': '0.8057', 'grad_norm': '0.3555', 'learning_rate': '0.0002928', 'epoch': '0.01152'}
+{'loss': '0.8026', 'grad_norm': '0.3535', 'learning_rate': '0.0002925', 'epoch': '0.012'}
