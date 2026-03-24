@@ -178,8 +178,8 @@ def main():
         
     import shutil
     parser = argparse.ArgumentParser(description="生成 CFG Dataset 并保存为 Parquet 格式")
-    parser.add_argument("--config_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/data-synthetic-pretrain/Lano-cfg/configs/cfg3f.json", help="使用的 CFG 规则配置文件")
-    parser.add_argument("--save_dir", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets", help="数据的输出保护路径")
+    parser.add_argument("--config_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/data-synthetic-pretrain/Lano-cfg/configs/cfg3b.json", help="使用的 CFG 规则配置文件")
+    parser.add_argument("--save_dir", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/512_Padding/cfg3b", help="数据的输出保护路径")
     parser.add_argument("--model_path", type=str, default="/ruilab/jxhe/CoE_Monitor/checkpoints/GPT_2_Small", help="模型路径，用于获取bos和eos")
     
     # 论文中无限数据范式相当于使用全量随机构造。1亿 token 大约对应约 195,000 个长度为 512 的 sequence chunks。
@@ -203,39 +203,39 @@ def main():
     config = CFG_Config.from_graph(args.config_path)
     print("CFG 载入完成. Number of symbols (Terminals):", config.num_sym)
     
-    # # 2. 生成 Train 训练集
-    # print("\n--- 构建训练集 ---")
-    # train_out_final = os.path.join(args.save_dir, "train.parquet")
-    # train_out_tmp = os.path.join(args.save_dir, "train_tmp_parquet")
+    # 2. 生成 Train 训练集
+    print("\n--- 构建训练集 ---")
+    train_out_final = os.path.join(args.save_dir, "train.parquet")
+    train_out_tmp = os.path.join(args.save_dir, "train_tmp_parquet")
 
-    # if os.path.exists(train_out_tmp):
-    #     shutil.rmtree(train_out_tmp)
-    # os.makedirs(train_out_tmp, exist_ok=True)
+    if os.path.exists(train_out_tmp):
+        shutil.rmtree(train_out_tmp)
+    os.makedirs(train_out_tmp, exist_ok=True)
             
-    # generate_continuous_chunks_to_parquet(
-    #     config_path=args.config_path, 
-    #     seed=42, 
-    #     num_chunks=args.train_chunks, 
-    #     bos_token_id=bos_token_id, eos_token_id=eos_token_id,
-    #     pad_token_id=pad_token_id,
-    #     chunk_size=args.chunk_size,
-    #     save_dir=train_out_tmp,
-    #     cache_size=100000,
-    #     num_workers=args.num_workers
-    # )
+    generate_continuous_chunks_to_parquet(
+        config_path=args.config_path, 
+        seed=42, 
+        num_chunks=args.train_chunks, 
+        bos_token_id=bos_token_id, eos_token_id=eos_token_id,
+        pad_token_id=pad_token_id,
+        chunk_size=args.chunk_size,
+        save_dir=train_out_tmp,
+        cache_size=100000,
+        num_workers=args.num_workers
+    )
     
-    # # 统一合并成唯一 Parquet
-    # merge_parquet_files(train_out_tmp, train_out_final)
-    # print(f"预训练集已妥善保存至单一文件: {train_out_final}")
+    # 统一合并成唯一 Parquet
+    merge_parquet_files(train_out_tmp, train_out_final)
+    print(f"预训练集已妥善保存至单一文件: {train_out_final}")
     
-    # # 额外保存前 10 条测试用的明文 (读取构建好数据集的开头展示即可)
-    # try:
-    #     df_train_head = pd.read_parquet(train_out_final, engine='pyarrow').head(10)
-    #     train_sample_txt = os.path.join(args.save_dir, "train_samples_head10.txt")
-    #     save_sample_txt(df_train_head['input_ids'].tolist(), config, bos_token_id, eos_token_id, train_sample_txt, num_samples=10)
-    #     print(f"前 10 条训练样本明文已导出至: {train_sample_txt}")
-    # except Exception as e:
-    #      print(f"提取前10条明文失败: {e}")
+    # 额外保存前 10 条测试用的明文 (读取构建好数据集的开头展示即可)
+    try:
+        df_train_head = pd.read_parquet(train_out_final, engine='pyarrow').head(10)
+        train_sample_txt = os.path.join(args.save_dir, "train_samples_head10.txt")
+        save_sample_txt(df_train_head['input_ids'].tolist(), config, bos_token_id, eos_token_id, train_sample_txt, num_samples=10)
+        print(f"前 10 条训练样本明文已导出至: {train_sample_txt}")
+    except Exception as e:
+         print(f"提取前10条明文失败: {e}")
     
     # 3. 生成 Test 测试集
     print("\n--- 构建测试集 ---")
@@ -249,7 +249,7 @@ def main():
     # 测试集不切分 chunk，生成直接可用的独立样本
     generate_independent_samples_to_parquet(
         config_path=args.config_path, 
-        seed=10042, 
+        seed=1_000_000_042, 
         num_samples=args.test_samples, 
         bos_token_id=bos_token_id, eos_token_id=eos_token_id,
         save_dir=test_out_tmp,

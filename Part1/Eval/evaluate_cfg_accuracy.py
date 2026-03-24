@@ -1,7 +1,7 @@
 import os
 import json
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 
 from tqdm import tqdm
@@ -10,6 +10,29 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append("/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/Lano-cfg")
 from data_cfg import CFG_Config
+
+
+_WORKER_CONFIG = None
+_WORKER_BOS_TOKEN = None
+_WORKER_EOS_TOKEN = None
+
+
+def _init_worker(config_path, bos_token, eos_token):
+    """每个子进程初始化一次：加载 CFG 配置并缓存 token。"""
+    global _WORKER_CONFIG, _WORKER_BOS_TOKEN, _WORKER_EOS_TOKEN
+    _WORKER_CONFIG = CFG_Config.from_graph(config_path)
+    _WORKER_BOS_TOKEN = bos_token
+    _WORKER_EOS_TOKEN = eos_token
+
+
+def _eval_accuracy_in_worker(generated_seq):
+    """子进程内判分入口（避免在 map 中反复传递 config 大对象）。"""
+    return eval_accuracy(
+        _WORKER_CONFIG,
+        generated_seq,
+        bos_token=_WORKER_BOS_TOKEN,
+        eos_token=_WORKER_EOS_TOKEN,
+    )
 
 
 def eval_accuracy(config, generated_seq, bos_token, eos_token):
@@ -36,14 +59,17 @@ def eval_accuracy(config, generated_seq, bos_token, eos_token):
     return count == 0
 
 
-def parallel_eval_accuracy(config, sequences, bos_token, eos_token, num_workers, desc):
-    """并发（或单线程）执行准确率判定，返回逐样本 bool 列表。"""
+def parallel_eval_accuracy(config, config_path, sequences, bos_token, eos_token, num_workers, desc):
+    """并发（或单进程）执行准确率判定，返回逐样本 bool 列表。"""
     if num_workers <= 1:
         return [eval_accuracy(config, seq, bos_token, eos_token) for seq in tqdm(sequences, desc=desc)]
 
-    eval_fn = partial(eval_accuracy, config, bos_token=bos_token, eos_token=eos_token)
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        return list(tqdm(executor.map(eval_fn, sequences), total=len(sequences), desc=desc))
+    with ProcessPoolExecutor(
+        max_workers=num_workers,
+        initializer=_init_worker,
+        initargs=(config_path, bos_token, eos_token),
+    ) as executor:
+        return list(tqdm(executor.map(_eval_accuracy_in_worker, sequences), total=len(sequences), desc=desc))
 
 
 def write_jsonl(path, records):
@@ -53,6 +79,14 @@ def write_jsonl(path, records):
     with open(path, "w", encoding="utf-8") as f:
         for item in records:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+
+def write_text(path, text):
+    dir_path = os.path.dirname(path)
+    if dir_path:
+        os.makedirs(dir_path, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 def read_jsonl(path):
@@ -74,14 +108,25 @@ def extract_generated_ids(record):
 def main():
     parser = argparse.ArgumentParser(description="只做 CFG 判分（读取已生成样本）")
     parser.add_argument("--config_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/Lano-cfg/configs/cfg3f.json")
-    parser.add_argument("--generated_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/Eval/generated_samples_20_temp1.0_type_standard_checkpoint-65000.jsonl")
+    parser.add_argument("--p", type=str, default="")
     parser.add_argument("--judge_workers", type=int, default=max(1, (os.cpu_count() or 1) // 2))
     parser.add_argument("--save_judged_results_path", type=str, default="")
     parser.add_argument("--save_bad_cases_path", type=str, default="")
+    parser.add_argument("--save_good_cases_path", type=str, default="")
+    parser.add_argument("--save_report_path", type=str, default="")
     args = parser.parse_args()
 
-    BOS_TOKEN = 100
-    EOS_TOKEN = 101
+    args.generated_path = args.p
+
+
+    args.save_judged_results_path = os.path.join(os.path.dirname(args.generated_path), "judged_results.jsonl") if not args.save_judged_results_path else args.save_judged_results_path
+    args.save_bad_cases_path = os.path.join(os.path.dirname(args.generated_path), "bad_cases.jsonl") if not args.save_bad_cases_path else args.save_bad_cases_path
+    args.save_good_cases_path = os.path.join(os.path.dirname(args.generated_path), "good_cases.jsonl") if not args.save_good_cases_path else args.save_good_cases_path
+    args.save_report_path = os.path.join(os.path.dirname(args.generated_path), "final_report.txt") if not args.save_report_path else args.save_report_path
+
+
+    BOS_TOKEN = 0
+    EOS_TOKEN = 4
 
     if not os.path.exists(args.generated_path):
         print(f"找不到生成文件 {args.generated_path}，请先运行 generate_cfg_samples.py")
@@ -115,8 +160,11 @@ def main():
 
     print(f"读取到 {len(records)} 条记录，开始判分...")
 
+    print(f"num_uncond={len(uncond_sequences)}, num_cond={len(cond_sequences)}, judge_workers={args.judge_workers}")
+
     uncond_results = parallel_eval_accuracy(
         config,
+        args.config_path,
         uncond_sequences,
         BOS_TOKEN,
         EOS_TOKEN,
@@ -126,6 +174,7 @@ def main():
 
     cond_results = parallel_eval_accuracy(
         config,
+        args.config_path,
         cond_sequences,
         BOS_TOKEN,
         EOS_TOKEN,
@@ -156,11 +205,24 @@ def main():
         write_jsonl(args.save_bad_cases_path, bad_cases)
         print(f"已保存 bad case 到: {args.save_bad_cases_path} (共 {len(bad_cases)} 条)")
 
-    print("-" * 50)
-    print("【评测最终报告】")
-    print(f"场景一 (无条件, 即生成完整句子) Accuracy: {acc_uncond * 100:.4f}%  (n={total_uncond})")
-    print(f"场景二 (有条件, 馈送前缀后续写) Accuracy: {acc_cond * 100:.4f}%  (n={total_cond})")
-    print("-" * 50)
+    if args.save_good_cases_path:
+        good_cases = [item for item in records if item.get("is_correct") is True]
+        write_jsonl(args.save_good_cases_path, good_cases)
+        print(f"已保存 good case 到: {args.save_good_cases_path} (共 {len(good_cases)} 条)")
+
+    report_lines = [
+        "-" * 50,
+        "【评测最终报告】",
+        f"场景一 (无条件, 即生成完整句子) Accuracy: {acc_uncond * 100:.4f}%  (n={total_uncond})",
+        f"场景二 (有条件, 馈送前缀后续写) Accuracy: {acc_cond * 100:.4f}%  (n={total_cond})",
+        "-" * 50,
+    ]
+    report_text = "\n".join(report_lines)
+    print(report_text)
+
+    if args.save_report_path:
+        write_text(args.save_report_path, report_text + "\n")
+        print(f"已保存评测报告到: {args.save_report_path}")
 
 
 if __name__ == "__main__":

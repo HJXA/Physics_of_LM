@@ -5,6 +5,8 @@ import torch
 from torch import nn
 from typing import Optional
 from collections.abc import Callable
+import sys
+sys.path.append("/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/model/gpt2")
 from modeling_gpt2 import GPT2Model, GPT2Attention, GPT2Block, GPT2Config
 from transformers.cache_utils import Cache, DynamicCache, EncoderDecoderCache
 from transformers.masking_utils import create_bidirectional_mask, create_causal_mask
@@ -50,10 +52,6 @@ def apply_rotary_pos_emb(q, k, cos, sin):
     def rotate_half(x):
         return torch.cat((-x[..., x.shape[-1] // 2:], x[..., : x.shape[-1] // 2]), dim=-1)
 
-    # print("cos:", cos.shape)
-    # print("sin:", sin.shape)
-    # print("q:", q.shape)
-    # print("k:", k.shape)
     cos = cos.unsqueeze(1)
     sin = sin.unsqueeze(1)
 
@@ -656,12 +654,6 @@ def test_all_variants_loss_not_nan():
         try:
             torch.manual_seed(42)
             model = CustomGPT2LMHeadModel._from_config(config, gpt_type=gpt_type).to(device)
-            # model = GPT2LMHeadModel.from_pretrained(
-            #     "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/GPT_2_Init/GPT_2_standard",
-            #     attn_implementation="flash_attention_2",
-            #     dtype=torch.bfloat16,
-            #     device_map="auto"
-		    # )
             model.eval()
             with torch.no_grad():
                 outputs = model(
@@ -711,13 +703,7 @@ def test_all_variants_cache_consistency():
     for gpt_type in gpt_types:
         try:
             torch.manual_seed(42)
-            model = CustomGPT2LMHeadModel._from_config(config, gpt_type=gpt_type).to(device)
-            # model = GPT2LMHeadModel.from_pretrained(
-            #     "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/GPT_2_Init/GPT_2_standard",
-            #     attn_implementation="flash_attention_2",
-            #     dtype=torch.bfloat16,
-            #     device_map="auto"
-		    # )
+            model = CustomGPT2LMHeadModel._from_config(config, gpt_type=gpt_type, dtype = torch.bfloat16).to(device)
             model.eval()
 
             with torch.no_grad():

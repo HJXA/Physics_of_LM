@@ -11,25 +11,11 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     
 
-
-
 def normalize_token_sequence(seq):
     """当前链路只接受 list / ndarray / tensor，统一为 list[int]。"""
     if hasattr(seq, "tolist"):
         seq = seq.tolist()
     return [int(x) for x in seq]
-
-
-
-
-
-def strip_bos_eos_for_judge(seq, bos_token, eos_token):
-    seq = normalize_token_sequence(seq)
-    if len(seq) > 0 and seq[0] == bos_token:
-        seq = seq[1:]
-    if len(seq) > 0 and seq[-1] == eos_token:
-        seq = seq[:-1]
-    return seq
 
 
 def write_jsonl(path, records):
@@ -41,25 +27,11 @@ def write_jsonl(path, records):
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
 
-def apply_allowed_token_mask(next_token_logits, allowed_token_ids):
-    """在采样前对 logits 做掩码：仅允许 allowed_token_ids 出现。"""
-    vocab_size = next_token_logits.shape[-1]
-    valid_allowed = [token_id for token_id in allowed_token_ids if 0 <= token_id < vocab_size]
-    if not valid_allowed:
-        raise ValueError(f"allowed_token_ids 与模型词表不匹配，词表大小={vocab_size}，allowed={allowed_token_ids}")
-
-    masked_logits = torch.full_like(next_token_logits, float("-inf"))
-    index_tensor = torch.tensor(valid_allowed, dtype=torch.long, device=next_token_logits.device)
-    masked_logits[index_tensor] = next_token_logits[index_tensor]
-    return masked_logits
-
-
-def sample_sequence(model, prompt_ids, max_new_tokens=512, eos_token=0, temperature=1.0, allowed_token_ids=None):
+def sample_sequence(model, prompt_ids, max_new_tokens=512, eos_token=0, temperature=1.0):
     """自回归生成（带 KV cache）。"""
     device = model.device
     prompt_ids = normalize_token_sequence(prompt_ids)
     input_ids = torch.tensor([prompt_ids], dtype=torch.long, device=device)
-
     generated = list(prompt_ids)
     if max_new_tokens <= 0:
         return generated
@@ -72,11 +44,6 @@ def sample_sequence(model, prompt_ids, max_new_tokens=512, eos_token=0, temperat
         for x in range(max_new_tokens):
             
             next_token_logits = logits[0, -1, :]
-            if allowed_token_ids is not None:
-                next_token_logits = apply_allowed_token_mask(next_token_logits, allowed_token_ids)
-
-            if x == 0 and allowed_token_ids is not None:
-                allowed_token_ids.append(eos_token)
 
             if temperature > 0:
                 probs = torch.softmax(next_token_logits / temperature, dim=-1)
@@ -93,44 +60,94 @@ def sample_sequence(model, prompt_ids, max_new_tokens=512, eos_token=0, temperat
             outputs = model(next_token, use_cache=True, past_key_values=past_key_values)
             logits = outputs.logits
             past_key_values = outputs.past_key_values
-        if allowed_token_ids is not None:
-            allowed_token_ids.remove(eos_token)
 
     return generated
 
 
+def sample_sequence_batch(model, prompt_ids_batch, max_new_tokens=512, eos_token=0, temperature=1.0, pad_token=0):
+    """批量自回归生成（带 KV cache，左填充对齐）。"""
+    if len(prompt_ids_batch) == 0:
+        return []
+
+    device = model.device
+    prompt_ids_batch = [normalize_token_sequence(ids) for ids in prompt_ids_batch]
+    generated_batch = [list(ids) for ids in prompt_ids_batch]
+
+    if max_new_tokens <= 0:
+        return generated_batch
+
+    max_prompt_len = max(len(ids) for ids in prompt_ids_batch)
+    input_ids_list = []
+    attention_mask_list = []
+    for ids in prompt_ids_batch:
+        pad_len = max_prompt_len - len(ids)
+        input_ids_list.append([pad_token] * pad_len + ids)
+        attention_mask_list.append([0] * pad_len + [1] * len(ids))
+
+    input_ids = torch.tensor(input_ids_list, dtype=torch.long, device=device)
+    attention_mask = torch.tensor(attention_mask_list, dtype=torch.long, device=device)
+    finished = [False] * len(prompt_ids_batch)
+
+    with torch.inference_mode():
+        outputs = model(input_ids, attention_mask=attention_mask, use_cache=True)
+        logits = outputs.logits
+        past_key_values = outputs.past_key_values
+
+        for _ in range(max_new_tokens):
+            next_token_logits = logits[:, -1, :]
+
+            if temperature > 0:
+                probs = torch.softmax(next_token_logits / temperature, dim=-1)
+                next_tokens = torch.multinomial(probs, num_samples=1)
+            else:
+                next_tokens = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+
+            for idx in range(len(generated_batch)):
+                if finished[idx]:
+                    continue
+                next_token_id = int(next_tokens[idx, 0].item())
+                generated_batch[idx].append(next_token_id)
+                if next_token_id == eos_token:
+                    finished[idx] = True
+
+            if all(finished):
+                break
+
+            outputs = model(next_tokens, use_cache=True, past_key_values=past_key_values)
+            logits = outputs.logits
+            past_key_values = outputs.past_key_values
+
+    return generated_batch
+
+
 def build_saved_record(index, scenario, prompt_ids, generated_seq, bos_token, eos_token):
     generated_ids = normalize_token_sequence(generated_seq)
-    judge_input_ids = strip_bos_eos_for_judge(generated_ids, bos_token, eos_token)
     return {
         "index": index,
         "judge_input_len": len(generated_ids),
         "scenario": scenario,
         "prompt_ids": normalize_token_sequence(prompt_ids),
         "generate_id": generated_ids,
-        "judge_input_text": " ".join(map(str, judge_input_ids)),
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description="只生成样本并保存（不做正确性判断）")
-    parser.add_argument("--test_data_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/test.parquet")
-    parser.add_argument("--model_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_standard_pretrain/checkpoint-65000")
-    parser.add_argument("--num_eval_samples", type=int, default=20)
-    parser.add_argument("--prefix_len", type=int, default=25)
+    parser.add_argument("--test_data_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/512_Padding/cfg3f/test.parquet")
+    parser.add_argument("--model_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_rot_Pretrain/checkpoint-100000")
+    parser.add_argument("--num_eval_samples", type=int, default=200)
+    parser.add_argument("--prefix_len", type=int, default=50)
+    parser.add_argument("--batch_size", type=int, default=192)
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--max_new_tokens", type=int, default=512)
-    parser.add_argument("--allowed_token_ids", type=str, default="")
-    parser.add_argument("--save_generated_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/Eval/")
+    parser.add_argument("--save_generated_path", type=str, default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/Eval/result")
     args = parser.parse_args()
 
     
 
-    BOS_TOKEN = 100
-    EOS_TOKEN = 101
-    
-    allowed_token_ids = [int(x.strip()) for x in args.allowed_token_ids.split(",") if x.strip()]
-    allowed_token_set = set(allowed_token_ids)
+    BOS_TOKEN = 0
+    PAD_TOKEN = 5
+    EOS_TOKEN = 4
 
     import pandas as pd
     if not os.path.exists(args.test_data_path):
@@ -142,63 +159,121 @@ def main():
     num_eval = min(args.num_eval_samples, len(test_samples))
     print(f"已加载 {len(test_samples)} 条测试数据。将生成 {num_eval} 条样本（每条含 uncond+cond 两个场景）。")
 
-    sys.path.append("/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/model")
-    from modeling_gpt2_variants import CustomGPT2LMHeadModel
+    sys.path.append("/ruilab/jxhe/CoE_Monitor/Physics_of_LM")
+    from Part1.Train.train_utils import load_model
 
-    gpt_type = args.model_path.split("/")[-1].split("_")[1] if "checkpoint" not in args.model_path else args.model_path.split("/")[-2].split("_")[1]
+    model_type = args.model_path.split("/")[-1] if "checkpoint" not in args.model_path else args.model_path.split("/")[-2]
     checkpoints = args.model_path.split("/")[-1] if "checkpoint" in args.model_path else "End"
-    args.save_generated_path = os.path.join(args.save_generated_path, f"generated_samples_{args.num_eval_samples}_temp{args.temperature}_type_{gpt_type}_{checkpoints}.jsonl")
-
-    model = CustomGPT2LMHeadModel.from_pretrained(
-        args.model_path,
-        gpt_type=gpt_type,
-        device_map="auto",
+    args.save_generated_path = os.path.join(args.save_generated_path,f"{model_type}",f"{checkpoints}",f"samples_{args.num_eval_samples}" , f"generated_temp{args.temperature}_all.jsonl")
+    gpt_type = model_type.split("_")[-2] if "gpt" in model_type.lower() else None
+    print(f"模型类型: {model_type}, GPT 变体: {gpt_type}, 检查点: {checkpoints}")
+    model = load_model(
+        model_path=args.model_path,
+        model_variant_type=gpt_type,
+        dtype=torch.bfloat16,
     )
+    print(model)
+    model.config.bos_token_id = BOS_TOKEN
+    model.config.pad_token_id = PAD_TOKEN
+    model.config.eos_token_id = EOS_TOKEN
+    model.to("cuda")
     model.eval()
 
     records = []
     print("开始生成...")
-    for i in tqdm(range(num_eval)):
-        gen_seq_uncond = sample_sequence(
-            model=model,
-            prompt_ids=[BOS_TOKEN],
-            max_new_tokens=args.max_new_tokens,
-            eos_token=EOS_TOKEN,
-            temperature=args.temperature,
-            allowed_token_ids=allowed_token_ids,
-        )
-        records.append(build_saved_record(
-            index=i,
-            scenario="unconditional",
-            prompt_ids=[BOS_TOKEN],
-            generated_seq=gen_seq_uncond,
-            bos_token=BOS_TOKEN,
-            eos_token=EOS_TOKEN,
-        ))
+    if args.batch_size <= 1:
+        for i in tqdm(range(num_eval)):
+            gen_seq_uncond = sample_sequence(
+                model=model,
+                prompt_ids=[BOS_TOKEN],
+                max_new_tokens=args.max_new_tokens,
+                eos_token=EOS_TOKEN,
+                temperature=args.temperature,
+            )
+            records.append(build_saved_record(
+                index=i,
+                scenario="unconditional",
+                prompt_ids=[BOS_TOKEN],
+                generated_seq=gen_seq_uncond,
+                bos_token=BOS_TOKEN,
+                eos_token=EOS_TOKEN,
+            ))
 
-        sample_ids = normalize_token_sequence(test_samples[i])
-        gt_seq = sample_ids[:]
-        if len(gt_seq) > 0 and gt_seq[-1] == EOS_TOKEN:
-            gt_seq = gt_seq[:-1]
+            sample_ids = normalize_token_sequence(test_samples[i])
+            gt_seq = sample_ids[:]
+            if len(gt_seq) > 0 and gt_seq[-1] == EOS_TOKEN:
+                gt_seq = gt_seq[:-1]
 
-        prefix = gt_seq[:args.prefix_len] if len(gt_seq) > args.prefix_len else gt_seq
+            prefix = gt_seq[:args.prefix_len] if len(gt_seq) > args.prefix_len else gt_seq
 
-        gen_seq_cond = sample_sequence(
-            model=model,
-            prompt_ids=prefix,
-            max_new_tokens=max(0, args.max_new_tokens - len(prefix)),
-            eos_token=EOS_TOKEN,
-            temperature=args.temperature,
-            allowed_token_ids=allowed_token_ids,
-        )
-        records.append(build_saved_record(
-            index=i,
-            scenario="conditional",
-            prompt_ids=prefix,
-            generated_seq=gen_seq_cond,
-            bos_token=BOS_TOKEN,
-            eos_token=EOS_TOKEN,
-        ))
+            gen_seq_cond = sample_sequence(
+                model=model,
+                prompt_ids=prefix,
+                max_new_tokens=max(0, args.max_new_tokens - len(prefix)),
+                eos_token=EOS_TOKEN,
+                temperature=args.temperature,
+            )
+            records.append(build_saved_record(
+                index=i,
+                scenario="conditional",
+                prompt_ids=prefix,
+                generated_seq=gen_seq_cond,
+                bos_token=BOS_TOKEN,
+                eos_token=EOS_TOKEN,
+            ))
+    else:
+        for start in tqdm(range(0, num_eval, args.batch_size)):
+            end = min(start + args.batch_size, num_eval)
+            batch_indices = list(range(start, end))
+
+            uncond_prompts = [[BOS_TOKEN] for _ in batch_indices]
+            uncond_generated = sample_sequence_batch(
+                model=model,
+                prompt_ids_batch=uncond_prompts,
+                max_new_tokens=args.max_new_tokens,
+                eos_token=EOS_TOKEN,
+                temperature=args.temperature,
+                pad_token=PAD_TOKEN,
+            )
+            for pos, i in enumerate(batch_indices):
+                records.append(build_saved_record(
+                    index=i,
+                    scenario="unconditional",
+                    prompt_ids=uncond_prompts[pos],
+                    generated_seq=uncond_generated[pos],
+                    bos_token=BOS_TOKEN,
+                    eos_token=EOS_TOKEN,
+                ))
+
+            cond_prompts = []
+            cond_max_new_tokens = []
+            for i in batch_indices:
+                sample_ids = normalize_token_sequence(test_samples[i])
+                gt_seq = sample_ids[:]
+                if len(gt_seq) > 0 and gt_seq[-1] == EOS_TOKEN:
+                    gt_seq = gt_seq[:-1]
+                prefix = gt_seq[:args.prefix_len] if len(gt_seq) > args.prefix_len else gt_seq
+                cond_prompts.append(prefix)
+                cond_max_new_tokens.append(max(0, args.max_new_tokens - len(prefix)))
+
+            batch_max_new_tokens = max(cond_max_new_tokens) if cond_max_new_tokens else 0
+            cond_generated = sample_sequence_batch(
+                model=model,
+                prompt_ids_batch=cond_prompts,
+                max_new_tokens=batch_max_new_tokens,
+                eos_token=EOS_TOKEN,
+                temperature=args.temperature,
+                pad_token=PAD_TOKEN,
+            )
+            for pos, i in enumerate(batch_indices):
+                records.append(build_saved_record(
+                    index=i,
+                    scenario="conditional",
+                    prompt_ids=cond_prompts[pos],
+                    generated_seq=cond_generated[pos],
+                    bos_token=BOS_TOKEN,
+                    eos_token=EOS_TOKEN,
+                ))
 
     write_jsonl(args.save_generated_path, records)
     print(f"生成完成，已保存到: {args.save_generated_path}")

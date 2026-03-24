@@ -170,12 +170,14 @@ class SwanLabTrainer(Trainer):
 
         self.step_count += 1
         
-        # 当正在进行梯度累加且不是最后一次反向传播前向时，直接调用父类方法，跳过所有额外计算以提升速度
-        if self.args.gradient_accumulation_steps > 1 and self.step_count % self.args.gradient_accumulation_steps != 0:
-            return super().compute_loss(model, inputs, return_outputs=return_outputs, num_items_in_batch=num_items_in_batch)
+        # # 当正在进行梯度累加且不是最后一次反向传播前向时，直接调用父类方法，跳过所有额外计算以提升速度
+        # if self.args.gradient_accumulation_steps > 1 and self.step_count % self.args.gradient_accumulation_steps != 0:
+        #     return super().compute_loss(model, inputs, return_outputs=return_outputs, num_items_in_batch=num_items_in_batch)
 
-        # 针对当前步计算实际更新后的真实 Global Step
-        real_global_step = int(self.step_count // self.args.gradient_accumulation_steps)
+        # # 针对当前步计算实际更新后的真实 Global Step
+        # real_global_step = int(self.step_count // self.args.gradient_accumulation_steps)
+
+        real_global_step = self.step_count
 
         # ==================== 下面是真正的更新步或无梯度累加才会进入的代码 ====================
 
@@ -351,7 +353,7 @@ class SwanLabTrainer(Trainer):
                 coe_start = time.time()
 
 
-            z_ang_mean, a_in_mean, a_mid_mean, a_out_mean = CoEScoreInfo_Batch(layer_hidden_state).compute_CoE_Ang()
+            z_ang_mean, a_in_mean, a_mid_mean, a_out_mean = CoEScoreInfo_Batch(layer_hidden_state).compute_CoE()
 
 
             metrics = {
