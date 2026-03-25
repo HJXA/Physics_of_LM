@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
+# os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
 
 import json
 import argparse
@@ -162,14 +162,39 @@ def main():
     sys.path.append("/ruilab/jxhe/CoE_Monitor/Physics_of_LM")
     from Part1.Train.train_utils import load_model
 
-    model_type = args.model_path.split("/")[-1] if "checkpoint" not in args.model_path else args.model_path.split("/")[-2]
-    checkpoints = args.model_path.split("/")[-1] if "checkpoint" in args.model_path else "End"
-    args.save_generated_path = os.path.join(args.save_generated_path,f"{model_type}",f"{checkpoints}",f"samples_{args.num_eval_samples}" , f"generated_temp{args.temperature}_all.jsonl")
+    path_parts = [p for p in os.path.normpath(args.model_path).split(os.sep) if p]
+    model_base = path_parts[-1] if len(path_parts) >= 1 else "unknown_model"
+    parent_base = path_parts[-2] if len(path_parts) >= 2 else "unknown_dataset"
+    grandparent_base = path_parts[-3] if len(path_parts) >= 3 else "unknown_model_type"
+
+    if model_base.startswith("checkpoint"):
+        checkpoints = model_base
+        dataset_name = parent_base
+        model_type = grandparent_base
+    else:
+        checkpoints = "End"
+        dataset_name = parent_base
+        model_type = model_base
+
+    args.save_generated_path = os.path.join(
+        args.save_generated_path,
+        f"{model_type}",
+        f"{dataset_name}",
+        f"{checkpoints}",
+        f"samples_{args.num_eval_samples}",
+        f"generated_temp{args.temperature}_all.jsonl",
+    )
+
+    if os.path.exists(args.save_generated_path):
+        print(f"生成文件 {args.save_generated_path} 已存在，跳过生成步骤。")
+        return
     gpt_type = model_type.split("_")[-2] if "gpt" in model_type.lower() else None
-    print(f"模型类型: {model_type}, GPT 变体: {gpt_type}, 检查点: {checkpoints}")
+    if gpt_type is None and "llama_wpe" in path_parts:
+        gpt_type = "llama_wpe"
+    print(f"模型类型: {model_type}, 数据集: {dataset_name}, GPT 变体: {gpt_type}, 检查点: {checkpoints}")
     model = load_model(
         model_path=args.model_path,
-        model_variant_type=gpt_type,
+        model_type=gpt_type,
         dtype=torch.bfloat16,
     )
     print(model)
