@@ -10,14 +10,14 @@ from gpt2.modeling_gpt2_variants import CustomGPT2LMHeadModel
 from llama_wpe.modeling_llama_wpe import LlamaForCausalLMWPE
 
 
-GPT2_VARIANTS = {"standard", "rot", "rel", "pos", "uni"}
+GPT2_VARIANTS = {"standard", "rot", "rel", "pos", "uni", "raw"}
 
 
 def _resolve_attn_impl(model_path: str, variant: str) -> str:
 	"""按模型类型选择注意力实现。"""
 	if "gpt" not in model_path.lower():
 		return "flash_attention_2"
-	return "flash_attention_2" if variant in {"standard", "rot"} else "eager"
+	return "flash_attention_2" if variant in {"standard", "rot", "raw"} else "eager"
 
 
 def build_causal_lm_collator(pad_token_id: int):
@@ -74,7 +74,7 @@ def load_model(
 		print(f"Load pretrained LLaMA_wpe model from: {model_path} with {dtype}")
 		return LlamaForCausalLMWPE.from_pretrained(
 			model_path,
-			torch_dtype=dtype,
+			dtype=dtype,
 		)
 
 	attn_impl = "flash_attention_2"
@@ -83,7 +83,7 @@ def load_model(
 	return AutoModelForCausalLM.from_pretrained(
 		model_path,
 		attn_implementation=attn_impl,
-		torch_dtype=dtype,
+		dtype=dtype,
 	)
 
 

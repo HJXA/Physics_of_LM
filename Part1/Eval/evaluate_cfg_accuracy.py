@@ -47,6 +47,10 @@ def eval_accuracy(config, generated_seq, bos_token, eos_token):
     if len(generated_seq) < 2 or generated_seq[-1] != eos_token:
         return False
 
+    # 新增：如果序列中有token_id大于eos_token，直接返回False
+    if any(token_id > eos_token for token_id in generated_seq):
+        return False
+
     if generated_seq[0] == bos_token:
         pure_seq = generated_seq[1:-1]
     else:

@@ -1,5 +1,5 @@
 import os 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
 # export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 
 from transformers import (
@@ -22,7 +22,7 @@ MODEL_TYPE = None
 # Block 1: 配置路径与按论文要求的超参
 # ============================================================
 MODEL_ROOT = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/"
-MODEL_PATH = MODEL_ROOT + "llama_Init/Llama_vocab_6_113M" # 请在这里指向您初始化的GPT模型
+MODEL_PATH = MODEL_ROOT + "Init/gpt_2/gpt_2_raw" # 请在这里指向您初始化的GPT模型
 if "gpt" in MODEL_PATH.lower():
 	MODEL_TYPE = MODEL_PATH.split("/")[-1].split("_")[-1] # 要训练的 GPT 变体类型 ('standard', 'rot', 'rel', 'pos', 'uni')
 	print(f"准备训练 GPT: [{MODEL_TYPE}] | 模型路径: {MODEL_PATH}")
@@ -32,7 +32,7 @@ elif "llama_wpe" in MODEL_PATH.lower():
 
 OUTPUT_DIR = MODEL_ROOT + MODEL_PATH.split("/")[-1] # 模型输出目录
 
-TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/512_Padding/cfg3b/train.parquet"
+TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/512_Chunk/cfg3f_Chunk/train.parquet"
 
 DATASETS = TRAIN_PARQUET_PATH.split("/")[-2]
 

@@ -67,14 +67,14 @@ def init_all_variants():
     # 读入基础模型的配置
     try:
         config = GPT2Config.from_pretrained(BASE_CONFIG_PATH)
-        config.vocab_size = 6  # 强制设置 vocab_size=6 来匹配我们 CFG 数据集的特殊需求
+        # config.vocab_size = 6  # 强制设置 vocab_size=6 来匹配我们 CFG 数据集的特殊需求
     except Exception as e:
         print(f"Error loading config from {BASE_CONFIG_PATH}: {e}")
         print("请检查基础路径是否正确且含有 config.json 文件。")
         return
 
     # 涵盖所有的指定模型变体
-    variants = ['standard','rot', 'rel', 'pos', 'uni']
+    variants = ['standard']
     
     for v_type in variants:
         print("=" * 50)

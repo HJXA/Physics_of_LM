@@ -11,9 +11,12 @@ export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 TEST_DATA_PATH="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/datasets/512_Padding/cfg3f/test.parquet"
 CONFIG_PATH="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/Lano-cfg/configs/cfg3f.json"
 MODELS=(
-  "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_standard_Pretrain/cfg3f/checkpoint-100000"
-  "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/llama_rope/cfg3f/checkpoint-100000"
-  "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/llama_wpe/cfg3f/checkpoint-100000"
+  # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_standard/cfg3f/checkpoint-100000"
+  # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/llama_rope/cfg3f/checkpoint-100000"
+  # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/llama_wpe/cfg3f/checkpoint-100000"
+  # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_standard/cfg3f_Chunk/checkpoint-100000"
+  "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_2_raw/cfg3f/checkpoint-100000"
+
 )
 
 
@@ -23,9 +26,9 @@ BATCH_SIZE=192
 TEMPERATURE="1.0"
 MAX_NEW_TOKENS=512
 SAVE_ROOT="${SCRIPT_DIR}/result"
-JUDGE_WORKERS=32
-BADCASE_WORKERS=32
-CUDA_DEVICES="0"
+JUDGE_WORKERS=64
+BADCASE_WORKERS=64
+CUDA_DEVICES="2"
 
 if [[ -z "${TEST_DATA_PATH}" ]]; then
   echo "[ERROR] 请在脚本顶部配置 TEST_DATA_PATH"
@@ -88,7 +91,7 @@ for model_path in "${MODELS[@]}"; do
   generated_path="${sample_dir}/generated_temp${TEMPERATURE}_all.jsonl"
   bad_case_path="${sample_dir}/bad_cases.jsonl"
 
-  echo "[STEP 1/3] generate_cfg_samples.py"
+  echo "[STEP 1/2] generate_cfg_samples.py"
   python "${SCRIPT_DIR}/generate_cfg_samples.py" \
     --test_data_path "${TEST_DATA_PATH}" \
     --model_path "${model_path}" \
@@ -104,7 +107,7 @@ for model_path in "${MODELS[@]}"; do
     exit 1
   fi
 
-  echo "[STEP 2/3] evaluate_cfg_accuracy.py"
+  echo "[STEP 2/2] evaluate_cfg_accuracy.py"
   python "${SCRIPT_DIR}/evaluate_cfg_accuracy.py" \
     --config_path "${CONFIG_PATH}" \
     --p "${generated_path}" \
@@ -115,11 +118,7 @@ for model_path in "${MODELS[@]}"; do
     exit 1
   fi
 
-  echo "[STEP 3/3] calc_bad_case_edit_distance.py"
-  python "${SCRIPT_DIR}/calc_bad_case_edit_distance.py" \
-    --config_path "${CONFIG_PATH}" \
-    --p "${bad_case_path}" \
-    --num_workers "${BADCASE_WORKERS}"
+
 
   echo "[INFO] 模型评测完成: ${model_path}"
 done
