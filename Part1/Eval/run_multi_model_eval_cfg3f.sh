@@ -15,7 +15,8 @@ MODELS=(
   # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/llama_rope/cfg3f/checkpoint-100000"
   # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/llama_wpe/cfg3f/checkpoint-100000"
   # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_standard/cfg3f_Chunk/checkpoint-100000"
-  "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_2_raw/cfg3f/checkpoint-100000"
+  # "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_2_raw/cfg3f/checkpoint-100000"
+  "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part1/checkpoints/gpt_2_raw/cfg3f_Chunk/checkpoint-100000"
 
 )
 
@@ -28,7 +29,7 @@ MAX_NEW_TOKENS=512
 SAVE_ROOT="${SCRIPT_DIR}/result"
 JUDGE_WORKERS=64
 BADCASE_WORKERS=64
-CUDA_DEVICES="2"
+CUDA_DEVICES="0"
 
 if [[ -z "${TEST_DATA_PATH}" ]]; then
   echo "[ERROR] 请在脚本顶部配置 TEST_DATA_PATH"

@@ -12,12 +12,20 @@ import re
 import time
 import os
 import pickle
+from pathlib import Path
 
-import sys
-sys.path.append("/ruilab/jxhe/CoE_Monitor/utils")
+try:
+    from utils.Layer_Hidden import Layer_Hidden_Train
+    from utils.Coe_Scores_Batch import CoEScoreInfo_Train as CoEScoreInfo_Batch
+except ModuleNotFoundError:
+    import sys
 
-from Layer_Hidden import Layer_Hidden_Train
-from Coe_Scores_Batch import CoEScoreInfo_Train as CoEScoreInfo_Batch
+    project_root = Path(__file__).resolve().parents[3]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
+    from utils.Layer_Hidden import Layer_Hidden_Train
+    from utils.Coe_Scores_Batch import CoEScoreInfo_Train as CoEScoreInfo_Batch
 
 
 import swanlab
@@ -154,6 +162,10 @@ class SwanLabTrainer(Trainer):
 
         print(f"[CoeTrainer] Rank {self.rank}: 步数已设置为 {max_step}")
 
+    def _should_skip_custom_loss(self, model: nn.Module) -> bool:
+        # 评估/验证阶段 prediction_step 会调用 compute_loss，此时直接复用父类逻辑。
+        return not bool(getattr(model, "training", False))
+
 
     @override
     def compute_loss(
@@ -163,32 +175,48 @@ class SwanLabTrainer(Trainer):
         return_outputs: bool = False,
         num_items_in_batch: Optional[int] = None,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, Any]]:
+
+        if self._should_skip_custom_loss(model):
+            return super().compute_loss(
+                model,
+                inputs,
+                return_outputs=return_outputs,
+                num_items_in_batch=num_items_in_batch,
+            )
         
         # 复制 inputs 以防止原始字典中的 labels 被弹出
         # inputs_for_loss = inputs.copy()
         # labels = inputs.get("labels")
 
+        grad_acc_steps = max(1, int(getattr(self.args, "gradient_accumulation_steps", 1) or 1))
+        is_last_accum_forward = True
+        if model.training and grad_acc_steps > 1:
+            # accelerate 会在真正需要梯度同步/更新的 micro-step 上将 sync_gradients 设为 True。
+            # 这样也能正确覆盖 epoch 尾部不足 grad_acc_steps 的最后一个 micro-step。
+            is_last_accum_forward = bool(getattr(self.accelerator, "sync_gradients", True))
+
+        # 正在做梯度累加且不是最后一次反向传播前向：走父类快速路径，跳过所有额外计算。
+        if not is_last_accum_forward:
+            return super().compute_loss(
+                model,
+                inputs,
+                return_outputs=return_outputs,
+                num_items_in_batch=num_items_in_batch,
+            )
+
+        # 仅在真实参数更新步递增 step_count，保持其语义与 global update step 一致。
         self.step_count += 1
-        
-        # # 当正在进行梯度累加且不是最后一次反向传播前向时，直接调用父类方法，跳过所有额外计算以提升速度
-        # if self.args.gradient_accumulation_steps > 1 and self.step_count % self.args.gradient_accumulation_steps != 0:
-        #     return super().compute_loss(model, inputs, return_outputs=return_outputs, num_items_in_batch=num_items_in_batch)
-
-        # # 针对当前步计算实际更新后的真实 Global Step
-        # real_global_step = int(self.step_count // self.args.gradient_accumulation_steps)
-
-        real_global_step = self.step_count
 
         # ==================== 下面是真正的更新步或无梯度累加才会进入的代码 ====================
 
-        if real_global_step == 1 and self.rank == 0:
+        if self.step_count == 1 and self.rank == 0:
             print("input_ids.shape:", inputs['input_ids'].shape)
             print("input的labels.shape:", inputs['labels'].shape)
 
 
         if self.test_falg and self.rank==0:
             print("============测试模式=============")
-            if real_global_step == 1 and self.rank == 0:
+            if self.step_count == 1 and self.rank == 0:
                 print("input_ids:", inputs['input_ids'].tolist())
                 # print("labels:", inputs['labels'].tolist())
             torch.cuda.synchronize()
@@ -287,8 +315,8 @@ class SwanLabTrainer(Trainer):
 
         # CoE
 
-        if real_global_step == 1 and self.rank == 0:
-            print(f"=== Step {real_global_step} ===")
+        if self.step_count == 1 and self.rank == 0:
+            print(f"=== Step {self.step_count} ===")
             print("模型输出 keys:", outputs.keys())
             if hasattr(outputs, "logits"):
                 print("logits shape:", outputs.logits.shape)
@@ -309,7 +337,7 @@ class SwanLabTrainer(Trainer):
 
         
 
-        layer_hidden_state = Layer_Hidden_Train(outputs.hidden_states, labels = current_labels,eos_token_id=getattr(self.model.config, 'eos_token_id', None),pad_token_id=getattr(self.model.config, 'pad_token_id', None), steps = real_global_step, rank = self.accelerator.process_index, input_ids = inputs.get('input_ids'),train_type=self.train_type)
+        layer_hidden_state = Layer_Hidden_Train(outputs.hidden_states, labels = current_labels,eos_token_id=getattr(self.model.config, 'eos_token_id', None),pad_token_id=getattr(self.model.config, 'pad_token_id', None), steps = self.step_count, rank = self.accelerator.process_index, input_ids = inputs.get('input_ids'),train_type=self.train_type)
         # (Batch_Real, Layer, Hidden_Dim)
         if layer_hidden_state is not None:
 
@@ -325,7 +353,7 @@ class SwanLabTrainer(Trainer):
 
             save_path = os.path.join(
                 self.save_layer_hidden_root,
-                f"Step{real_global_step}_Rank{self.rank}.pt"
+                f"Step{self.step_count}_Rank{self.rank}.pt"
             )
 
             tensor_to_save = (
@@ -334,7 +362,7 @@ class SwanLabTrainer(Trainer):
                 .to(torch.bfloat16)   # 强烈建议压缩
                 .cpu()
             )
-            if real_global_step == 1 and self.rank == 0:
+            if self.step_count == 1 and self.rank == 0:
                 print(f"准备保存 Layer Hidden State: {tensor_to_save.shape}, layer_hidden_state 原始形状: {layer_hidden_state.shape}")
 
             
@@ -364,7 +392,7 @@ class SwanLabTrainer(Trainer):
             }
 
             if self.rank == 0:
-                swanlab.log(metrics, step=real_global_step)
+                swanlab.log(metrics, step=self.step_count)
 
             layer_hidden_state = None  # 释放内存
 
@@ -372,7 +400,7 @@ class SwanLabTrainer(Trainer):
                 torch.cuda.synchronize()
                 print("coe_add",time.time()-coe_start)
         else:
-            print(f"Step {real_global_step} Rank {self.rank}: Layer_Hidden_Train 返回 None，未保存 Layer Hidden State 也未计算 CoE 指标。")
+            print(f"Step {self.step_count} Rank {self.rank}: Layer_Hidden_Train 返回 None，未保存 Layer Hidden State 也未计算 CoE 指标。")
 
 
         # ==============================================================================
@@ -412,7 +440,7 @@ class SwanLabTrainer(Trainer):
             swanlab.log({
                 "loss": loss.item(), 
                 "acc": acc
-            }, step=real_global_step)
+            }, step=self.step_count)
 
         return (loss, outputs) if return_outputs else loss
     
@@ -452,3 +480,108 @@ class SwanLabTrainer(Trainer):
             print("step_time=",time.time()-step_start)
 
         return loss
+
+    # def prediction_step(
+    #     self,
+    #     model: nn.Module,
+    #     inputs: dict[str, torch.Tensor | Any],
+    #     prediction_loss_only: bool,
+    #     ignore_keys: list[str] | None = None,
+    # ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
+    #     """
+    #     Perform an evaluation step on `model` using `inputs`.
+
+    #     Subclass and override to inject custom behavior.
+
+    #     Args:
+    #         model (`nn.Module`):
+    #             The model to evaluate.
+    #         inputs (`dict[str, torch.Tensor | Any]`):
+    #             The inputs and targets of the model.
+
+    #             The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
+    #             argument `labels`. Check your model's documentation for all accepted arguments.
+    #         prediction_loss_only (`bool`):
+    #             Whether or not to return the loss only.
+    #         ignore_keys (`list[str]`, *optional*):
+    #             A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+    #             gathering predictions.
+
+    #     Return:
+    #         tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]: A tuple with the loss,
+    #         logits and labels (each being optional).
+    #     """
+    #     has_labels = False if len(self.label_names) == 0 else all(inputs.get(k) is not None for k in self.label_names)
+    #     # For CLIP-like models capable of returning loss values.
+    #     # If `return_loss` is not specified or being `None` in `inputs`, we check if the default value of `return_loss`
+    #     # is `True` in `model.forward`.
+    #     return_loss = inputs.get("return_loss")
+    #     if return_loss is None:
+    #         return_loss = self.can_return_loss
+    #     loss_without_labels = len(self.label_names) == 0 and return_loss
+
+    #     inputs = self._prepare_inputs(inputs)
+    #     if ignore_keys is None:
+    #         if hasattr(self.model, "config"):
+    #             ignore_keys = getattr(self.model.config, "keys_to_ignore_at_inference", ["past_key_values"])
+    #         else:
+    #             ignore_keys = []
+
+    #     # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
+    #     if has_labels or loss_without_labels:
+    #         labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
+    #         if len(labels) == 1:
+    #             labels = labels[0]
+    #     else:
+    #         labels = None
+
+    #     with torch.no_grad():
+    #         if is_sagemaker_mp_enabled():
+    #             raw_outputs = smp_forward_only(model, inputs)
+    #             if has_labels or loss_without_labels:
+    #                 if isinstance(raw_outputs, dict):
+    #                     loss_mb = raw_outputs["loss"]
+    #                     logits_mb = tuple(v for k, v in raw_outputs.items() if k not in ignore_keys + ["loss"])
+    #                 else:
+    #                     loss_mb = raw_outputs[0]
+    #                     logits_mb = raw_outputs[1:]
+
+    #                 loss = loss_mb.reduce_mean().detach().cpu()
+    #                 logits = smp_nested_concat(logits_mb)
+    #             else:
+    #                 loss = None
+    #                 if isinstance(raw_outputs, dict):
+    #                     logits_mb = tuple(v for k, v in raw_outputs.items() if k not in ignore_keys)
+    #                 else:
+    #                     logits_mb = raw_outputs
+    #                 logits = smp_nested_concat(logits_mb)
+    #         else:
+    #             if has_labels or loss_without_labels:
+    #                 with self.compute_loss_context_manager():
+    #                     num_items_in_batch = self._get_num_items_in_batch([inputs], self.args.device)
+    #                     loss, outputs = self.compute_loss(
+    #                         model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+    #                     )
+    #                 loss = loss.detach().mean()
+
+    #                 if isinstance(outputs, dict):
+    #                     logits = tuple(v for k, v in outputs.items() if k not in ignore_keys + ["loss"])
+    #                 else:
+    #                     logits = outputs[1:]
+    #             else:
+    #                 loss = None
+    #                 with self.compute_loss_context_manager():
+    #                     outputs = model(**inputs)
+    #                 if isinstance(outputs, dict):
+    #                     logits = tuple(v for k, v in outputs.items() if k not in ignore_keys)
+    #                 else:
+    #                     logits = outputs
+
+    #     if prediction_loss_only:
+    #         return (loss, None, None)
+
+    #     logits = nested_detach(logits)
+    #     if len(logits) == 1:
+    #         logits = logits[0]
+
+    #     return (loss, logits, labels)

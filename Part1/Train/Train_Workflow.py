@@ -1,5 +1,5 @@
 import os 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # 请根据实际情况调整 GPU 可见性
 # export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 
 from transformers import (
