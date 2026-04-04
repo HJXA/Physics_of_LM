@@ -113,11 +113,12 @@ def generate_prompt2(self, word=None, mode=0):
 #   It's easy to adapt this code to perform augmentation.
 #   but you can also use our augmentation_permutation2 method below.
 ###################################################################################################################
-def get_text_simple3(person, order=0, reverse_md = False):
+def get_text_simple3(person, order=0, reverse_md = False, fixed_templates=False):
     """根据结构化 `person` 信息直接生成一段合成传记文本。
 
     - order 控制公司城市/公司名称两条信息的先后顺序；
     - reverse_md 控制生日中的“月-日”排列格式。
+    - fixed_templates=True 时固定使用每个模板池的第一个句式。
 
     函数内部维护多组同义句模板，通过随机采样降低表述单一性。
     """
@@ -430,12 +431,14 @@ def get_text_simple3(person, order=0, reverse_md = False):
         "{name} worked diligently at {company1name} to achieve their goals."
     ]
     
-    sentence1 = " " + random.choice(sentence_structures1)
-    sentence2 = " " + random.choice(sentence_structures2)
-    sentence3 = " " + random.choice(sentence_structures3)
-    sentence4 = " " + random.choice(sentence_structures4)
-    sentence5 = " " + random.choice(sentence_structures5)
-    sentence6 = " " + random.choice(sentence_structures6)
+    pick = (lambda structures: structures[0]) if fixed_templates else random.choice
+
+    sentence1 = " " + pick(sentence_structures1)
+    sentence2 = " " + pick(sentence_structures2)
+    sentence3 = " " + pick(sentence_structures3)
+    sentence4 = " " + pick(sentence_structures4)
+    sentence5 = " " + pick(sentence_structures5)
+    sentence6 = " " + pick(sentence_structures6)
     name = f"{person['first_name']} {person['middle_name']} {person['last_name']}"
     he_she = 'He' if person['id']%2==0 else 'She'
     if reverse_md:
@@ -580,7 +583,7 @@ def augmentation_permutation2(person, text):
                 assert False
             continue
         text[0] = text[0][1:]
-        if found_he or found_she or found_they and not full_name_not_found:
+        if (found_he or found_she or found_they) and not full_name_not_found:
             for i in range(1, len(text)):
                 if nname in text[i]:
                     if text[i].startswith(nname):
@@ -592,4 +595,6 @@ def augmentation_permutation2(person, text):
             y = x.replace('.','#')
             text = text.replace(y,x)
         text = ' '+text # add a space before first name
-        break
+        return text.strip()
+
+    raise RuntimeError("augmentation_permutation2 failed without producing a valid permutation")
