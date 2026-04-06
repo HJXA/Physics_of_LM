@@ -190,7 +190,7 @@ class SwanLabTrainer(Trainer):
 
         print(f"[CoeTrainer] Rank {self.rank}: 步数已设置为 {max_step}")
 
-    def _should_skip_custom_loss(self, model: nn.Module) -> bool:
+    def _is_eval_steps(self, model: nn.Module) -> bool:
         # 评估/验证阶段 prediction_step 会调用 compute_loss，此时直接复用父类逻辑。
         is_training = bool(getattr(model, "training", False))
 
@@ -228,14 +228,14 @@ class SwanLabTrainer(Trainer):
             if self.rank == 0:
                 if is_training:
                     print(
-                        f"训练进度日志: 全局更新步(step_count)={self.step_count}，当前模型状态=训练，"
-                        f"是否跳过自定义loss计算={not is_training}"
+                        f"[Eval测试]: 全局更新步(step_count)={self.step_count}，当前模型状态=训练，"
+                        f"是否依据eval来跳过自定义loss计算={not is_training}"
                     )
                 else:
                     print(
-                        f"训练进度日志: 全局更新步(step_count)={self.step_count}，当前模型状态=评估/验证，"
+                        f"[Eval测试]: 全局更新步(step_count)={self.step_count}，当前模型状态=评估/验证，"
                         f"评估轮数(eval_round)={self.eval_round}，该轮步数(per_eval_steps)={self.per_eval_steps}，"
-                        f"是否跳过自定义loss计算={not is_training}"
+                        f"是否依据eval来跳过自定义loss计算={not is_training}"
                     )
 
         return not is_training
@@ -250,7 +250,7 @@ class SwanLabTrainer(Trainer):
         num_items_in_batch: Optional[int] = None,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, Any]]:
 
-        if self._should_skip_custom_loss(model):
+        if self._is_eval_steps(model):
             return super().compute_loss(
                 model,
                 inputs,
@@ -272,6 +272,7 @@ class SwanLabTrainer(Trainer):
         if self.test_falg and self.rank == 0:
             self._test_micro_step_total += 1
             current_global_step = int(getattr(self.state, "global_step", 0))
+            print("="*10,"当前步总体统计","="*10)
             print(
                 f"[梯度累加测试][compute_loss] 微步统计: "
                 f"累计前向次数(micro_step_total)={self._test_micro_step_total}, "
@@ -284,6 +285,7 @@ class SwanLabTrainer(Trainer):
         # 正在做梯度累加且不是最后一次反向传播前向：走父类快速路径，跳过所有额外计算。
         if not is_last_accum_forward:
             if self.test_falg and self.rank == 0:
+                print("="*10,"当前非更新微步具体情况","="*10)
                 self._test_skipped_accum_forward_total += 1
                 print(
                     f"[梯度累加测试][compute_loss] 当前为非更新微步(micro-step)，已跳过自定义逻辑；"
@@ -304,6 +306,7 @@ class SwanLabTrainer(Trainer):
             self._test_update_step_total += 1
             expected_step_count = int(getattr(self.state, "global_step", 0)) + 1
             step_match = self.step_count == expected_step_count
+            print("="*10,"当前更新微步具体情况","="*10)
             print(
                 f"[梯度累加测试][compute_loss] 进入更新步逻辑: "
                 f"step_count(全局更新步计数) {prev_step_count}->{self.step_count}, "
@@ -315,12 +318,12 @@ class SwanLabTrainer(Trainer):
         # ==================== 下面是真正的更新步或无梯度累加才会进入的代码 ====================
 
         if self.step_count == 1 and self.rank == 0:
+            print("======================== 第 1 个更新步日志 ========================")
             print("首步输入张量形状: input_ids.shape=", inputs['input_ids'].shape)
             print("首步标签张量形状: labels.shape=", inputs['labels'].shape)
 
 
         if self.test_falg and self.rank==0:
-            print("============测试模式日志============")
             if self.step_count == 1 and self.rank == 0:
                 print("首步input_ids明细:", inputs['input_ids'].tolist())
                 print("首步labels明细:", inputs['labels'].tolist())
@@ -421,7 +424,6 @@ class SwanLabTrainer(Trainer):
         # CoE
 
         if self.step_count == 1 and self.rank == 0:
-            print(f"=== 第 {self.step_count} 个更新步日志 ===")
             print("模型输出字段(keys):", outputs.keys())
             if hasattr(outputs, "logits"):
                 print("logits 张量形状(logits.shape):", outputs.logits.shape)
@@ -488,6 +490,10 @@ class SwanLabTrainer(Trainer):
 
             z_ang_mean, a_in_mean, a_mid_mean, a_out_mean = CoEScoreInfo_Batch(layer_hidden_state).compute_CoE()
 
+            if self.test_falg and self.rank==0:
+                torch.cuda.synchronize()
+                print("CoE 指标计算与记录耗时(秒):", time.time()-coe_start)
+
 
             metrics = {
                 "CoE/Z_A_Mean": z_ang_mean,
@@ -501,9 +507,7 @@ class SwanLabTrainer(Trainer):
 
             layer_hidden_state = None  # 释放内存
 
-            if self.test_falg and self.rank==0:
-                torch.cuda.synchronize()
-                print("CoE 指标计算与记录耗时(秒):", time.time()-coe_start)
+            
         else:
             print(f"更新步(step_count)={self.step_count}, 进程(rank)={self.rank}: Layer_Hidden_Train 返回 None，未保存 Layer Hidden State，且未计算 CoE 指标。")
 
@@ -527,7 +531,7 @@ class SwanLabTrainer(Trainer):
 
             if self.test_falg and self.rank==0:
                 print("错位后真实标签(shift_labels):", shift_labels.tolist())
-                print("错位后预测类别(preds):", preds.tolist())
+                print("错位后的当前步模型的预测(preds):", preds.tolist())
             
             # 有效监督位掩码：labels != -100 的位置才参与准确率统计。
             valid_mask = (shift_labels != -100)

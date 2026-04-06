@@ -10,11 +10,12 @@
 
 # 导入类型标注工具，用于明确函数输入输出类型，方便 IDE 与静态检查。
 from typing import Callable, Dict, List, Sequence, Tuple
-
+from tqdm import tqdm  # 导入 tqdm 用于显示 tokenization 进度条，提升用户体验。
 # 导入 PyTorch，用于在 collator 内将 Python 列表转为 Tensor 并执行 padding。
 import torch
 # 导入 HuggingFace Dataset 类型，作为本文件主要输入输出的数据结构。
 from datasets import Dataset
+
 
 # 以下用于测试
 from transformers import AutoTokenizer
@@ -161,7 +162,7 @@ class PretrainTextTokenizerBuilder:
             all_attention: List[List[int]] = []
 
             # 遍历当前批次中每条文本。
-            for text in batch["text"]:
+            for text in tqdm(batch["text"], desc="Tokenizing batch (no chunk)"):
                 # 先 tokenize，再截断到 max_length。
                 ids = self._tokenize_text(str(text))[: self.max_length]
                 # 当前有效 token 全部标记为 1。
@@ -217,7 +218,7 @@ class PretrainTextTokenizerBuilder:
         buffer: List[int] = []
 
         # 遍历原始数据集中的每条样本。
-        for sample in dataset:
+        for sample in tqdm(dataset, desc="Tokenizing with chunk"):
             # 对单条文本 tokenize 并应用首尾 token 规则。
             token_ids = self._tokenize_text(str(sample["text"]))
             # 若为空序列，则跳过该样本。
@@ -660,6 +661,7 @@ class SFTMessagesTokenizerBuilder:
             _map_fn,
             desc="Tokenizing SFT dataset",
             remove_columns=dataset.column_names,
+            num_proc=4,  # 使用 4 个进程并行处理
         )
 
         # 构建 SFT collator（labels 在 tokenize 阶段已完成语义化构建）。

@@ -101,7 +101,7 @@ What is the birth date of Alice B. Chen? Answer: March 12, 1990.
 基本运行命令（在脚本目录下执行）：
 
 ```bash
-python generate_bios_datasets.py --num_samples 200000 --output_dir ./datasets --seed 42 --show_samples 10 --max_permute 5 --max_multi 5
+python generate_bios_datasets.py --num_samples 100000 --output_dir ./datasets --seed 42 --show_samples 10 --max_permute 5 --max_multi 5
 ```
 
 快速测试（生成 10 条并输出样本用于人工检查）：

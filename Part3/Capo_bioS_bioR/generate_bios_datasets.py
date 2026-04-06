@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 
 # 复用既有规则函数：文本合成函数 + 句子置换函数。
-from Capo_bioS_bioR.Capo_bioS_bioR import augmentation_permutation2, get_text_simple3
+from Capo_bioS_bioR import augmentation_permutation2, get_text_simple3
 
 
 # fields 目录的绝对路径（与当前脚本同级）。
