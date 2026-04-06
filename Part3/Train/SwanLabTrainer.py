@@ -228,11 +228,13 @@ class SwanLabTrainer(Trainer):
             if self.rank == 0:
                 if is_training:
                     print(
+                        f"\n\n\n"
                         f"[Eval测试]: 全局更新步(step_count)={self.step_count}，当前模型状态=训练，"
                         f"是否依据eval来跳过自定义loss计算={not is_training}"
                     )
                 else:
                     print(
+                        f"\n\n"
                         f"[Eval测试]: 全局更新步(step_count)={self.step_count}，当前模型状态=评估/验证，"
                         f"评估轮数(eval_round)={self.eval_round}，该轮步数(per_eval_steps)={self.per_eval_steps}，"
                         f"是否依据eval来跳过自定义loss计算={not is_training}"
@@ -313,6 +315,7 @@ class SwanLabTrainer(Trainer):
                 f"期望step_count(=global_step+1)={expected_step_count}, "
                 f"对齐校验(step_match)={step_match}, "
                 f"累计更新步次数(update_step_total)={self._test_update_step_total}"
+                f"\n\n"
             )
 
         # ==================== 下面是真正的更新步或无梯度累加才会进入的代码 ====================
@@ -577,9 +580,6 @@ class SwanLabTrainer(Trainer):
         Return:
             `torch.Tensor`: The tensor with training loss on this batch.
         """
-        # Prepare buffers for context parallelism
-        before_global_step = int(getattr(self.state, "global_step", 0))
-        before_step_count = self.step_count
 
         if self.test_falg and self.accelerator.is_main_process:
             torch.cuda.synchronize()
@@ -589,29 +589,6 @@ class SwanLabTrainer(Trainer):
 
         if self.test_falg and self.accelerator.is_main_process:
             torch.cuda.synchronize()
-            after_global_step = int(getattr(self.state, "global_step", 0))
-            after_step_count = self.step_count
-            is_update_step = after_global_step > before_global_step
-
-            if is_update_step:
-                inc_ok = after_step_count == (before_step_count + 1)
-                align_ok = after_step_count == after_global_step
-                print(
-                    f"[梯度累加测试][training_step] 本次为更新步(UPDATE): "
-                    f"global_step {before_global_step}->{after_global_step}, "
-                    f"step_count {before_step_count}->{after_step_count}, "
-                    f"step_count递增+1校验(inc_ok)={inc_ok}, "
-                    f"step_count与global_step对齐校验(align_ok)={align_ok}"
-                )
-            else:
-                stable_ok = after_step_count == before_step_count
-                print(
-                    f"[梯度累加测试][training_step] 本次为非更新微步(micro-step): "
-                    f"global_step {before_global_step}->{after_global_step}, "
-                    f"step_count {before_step_count}->{after_step_count}, "
-                    f"step_count稳定性校验(stable_ok)={stable_ok}"
-                )
-
             print("training_step 总耗时(秒):", time.time()-step_start)
 
         return loss

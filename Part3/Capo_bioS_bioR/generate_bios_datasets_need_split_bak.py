@@ -475,14 +475,8 @@ def generate_multi_augments(
         )
 
 
-def generate_qa(base_records: list[dict], datasets_root: str, samples_root: str, n_samples: int, qa_layout: str):
-    """生成六类 QA 数据（字符串格式）。
-
-    qa_layout:
-    - raw: 仅生成 QA/<q_name>/data.parquet（旧布局）
-    - final: 仅生成 QA/train/*.parquet + QA/test/*.parquet（最终布局）
-    - both: 同时生成 raw 与 final
-    """
+def generate_qa(base_records: list[dict], datasets_root: str, samples_root: str, n_samples: int):
+    """生成六类 QA 数据（字符串格式）。"""
     # 六类 QA 构造器：每个问题单独一个目录与 parquet。
     builders: list[tuple[str, Callable[[dict], str]]] = [
         (
@@ -503,23 +497,10 @@ def generate_qa(base_records: list[dict], datasets_root: str, samples_root: str,
     for qa_name, fn in builders:
         # 按当前问题模板映射所有人物。
         texts = [fn(r) for r in base_records]
-
-        # 旧布局：datasets/QA/<qa_name>/data.parquet。
-        if qa_layout in {"raw", "both"}:
-            raw_parquet_path = os.path.join(datasets_root, "QA", qa_name, "data.parquet")
-            save_text_parquet(texts, raw_parquet_path, datasets_root, samples_root, n_samples)
-
-        # 最终布局：datasets/QA/train/<q_name>.parquet 与 datasets/QA/test/<q_name>.parquet。
-        if qa_layout in {"final", "both"}:
-            split_idx = len(texts) // 2
-            train_texts = texts[:split_idx]
-            test_texts = texts[split_idx:]
-
-            train_parquet_path = os.path.join(datasets_root, "QA", "train", f"{qa_name}.parquet")
-            test_parquet_path = os.path.join(datasets_root, "QA", "test", f"{qa_name}.parquet")
-
-            save_text_parquet(train_texts, train_parquet_path, datasets_root, samples_root, n_samples)
-            save_text_parquet(test_texts, test_parquet_path, datasets_root, samples_root, n_samples)
+        # 目标路径：datasets/QA/<qa_name>/data.parquet。
+        parquet_path = os.path.join(datasets_root, "QA", qa_name, "data.parquet")
+        # 保存 text parquet，并同步导出 samples/QA/.../data.txt。
+        save_text_parquet(texts, parquet_path, datasets_root, samples_root, n_samples)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -544,14 +525,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max_permute", type=int, default=5, help="single permute 文件数（默认 5）")
     # multi 系列的 part 文件数量（默认 5）。
     parser.add_argument("--max_multi", type=int, default=5, help="multi 文件数（默认 5）")
-    # QA 输出布局：默认直接产出最终 train/test 结构。
-    parser.add_argument(
-        "--qa_layout",
-        type=str,
-        choices=["raw", "final", "both"],
-        default="final",
-        help="QA 输出布局：raw=旧布局, final=最终布局, both=两者都生成（默认 final）",
-    )
     # 返回解析器对象。
     return parser
 
@@ -628,7 +601,7 @@ def main():
     # 4) 从原始 base 信息出发生成六类 QA。
     print("\n[4/4] 生成 QA")
     # 保存 QA 数据与对应样本。
-    generate_qa(base_records, datasets_root, samples_root, args.show_samples, qa_layout=args.qa_layout)
+    generate_qa(base_records, datasets_root, samples_root, args.show_samples)
 
     # 打印完成信息。
     print("\n" + "=" * 72)
