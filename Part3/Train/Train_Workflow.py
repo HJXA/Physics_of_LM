@@ -1,7 +1,7 @@
 import os
 import time
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
 
 from datasets import Dataset, load_dataset
 from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM
@@ -25,13 +25,14 @@ TRAIN_TYPE = "SFT"  # 可选: "PT" / "SFT"
 # TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi_permute_fullname/part_*.parquet"
 
 # SFT
-MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/xxx'
+MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_2026_04_06_11_22_54'
 TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
 
 OUTPUT_BASE_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints"
 
 # tokenize 配置
-MAX_LENGTH = 512
+
+MAX_LENGTH = 512 if TRAIN_TYPE == "PT" else 128
 DO_CHUNK = True
 ADD_EOS_AT_START = True
 ADD_BOS_AT_END = True
@@ -93,6 +94,19 @@ def get_train_config(train_type: str, is_test: bool):
 	return config
 
 
+def get_sft_max_length_from_dataset(dataset: Dataset) -> int:
+	"""根据 dataset 的 text 列，返回最大字符串长度向上最近的 2 的次幂。"""
+	if "text" not in dataset.column_names:
+		raise ValueError("SFT 动态 MAX_LENGTH 计算要求数据集包含 'text' 列")
+
+	max_text_len = max(len(str(t)) for t in dataset["text"] if t is not None)
+	if max_text_len <= 0:
+		return 1
+
+	# 计算 >= max_text_len 的最小 2 的次幂
+	return 1 << (max_text_len - 1).bit_length()
+
+
 if IS_TEST:
 	MAX_LENGTH = 16
 
@@ -123,11 +137,15 @@ def part3_prepare_train_dataset(tokenizer, train_type: str):
 		)
 
 	if train_type == "SFT":
+		sft_max_length = get_sft_max_length_from_dataset(raw_dataset)
+		print(f"SFT 动态 MAX_LENGTH（text 向上 2 次幂）: {sft_max_length}")
+		print("此时的 MAX_LENGTH 配置（优先级高于动态计算）: ", MAX_LENGTH)
 		sft_source = part3_prepare_sft_source_dataset(raw_dataset)
+		print("SFT 数据预处理完成，样例: ", sft_source[:2])
 		return prepare_sft_dataset_from_messages(
 			dataset=sft_source,
 			tokenizer=tokenizer,
-			max_length=MAX_LENGTH,
+			max_length=sft_max_length if MAX_LENGTH is None else MAX_LENGTH,
 			add_bos_at_start=ADD_EOS_AT_START,
 			add_eos_at_end=ADD_BOS_AT_END,
 			apply_chat_template=APPLY_CHAT_TEMPLATE,  # SFT 不使用 chat 模板，直接拼接 messages
@@ -227,6 +245,7 @@ def main():
 
 	train_result = trainer.train()
 	trainer.save_model()
+	tokenizer.save_pretrained(output_dir)
 	metrics = train_result.metrics
 	metrics["train_samples"] = len(train_dataset)
 	trainer.log_metrics("train", metrics)

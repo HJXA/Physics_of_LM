@@ -22,15 +22,19 @@ from transformers import AutoTokenizer
 from train_utils import preview_collator_batch
 
 def build_tokenizer(model, model_path: str):
-	"""加载 tokenizer，保证pad_token_id不为None，至少为eos_token_id。"""
-	tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, trust_remote_code=True)
+    """加载 tokenizer，保证pad_token_id不为None，至少为eos_token_id。"""
+    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, trust_remote_code=True)
+    
+    # print(tokenizer)
+    if tokenizer.vocab_size <= 100:
+        raise ValueError(f"Tokenizer vocab size is {tokenizer.vocab_size}, likely only contains special tokens. Please check the tokenizer and model compatibility.")
 
-	if tokenizer.pad_token_id is None:
-		if tokenizer.eos_token is not None:
-			tokenizer.pad_token = tokenizer.eos_token
-			model.config.pad_token_id = tokenizer.eos_token_id
+    if tokenizer.pad_token_id is None:
+        if tokenizer.eos_token is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+            model.config.pad_token_id = tokenizer.eos_token_id
 
-	return tokenizer
+    return tokenizer
 
 
 class PretrainTextTokenizerBuilder:
