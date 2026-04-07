@@ -29,10 +29,9 @@ def build_tokenizer(model, model_path: str):
     if tokenizer.vocab_size <= 100:
         raise ValueError(f"Tokenizer vocab size is {tokenizer.vocab_size}, likely only contains special tokens. Please check the tokenizer and model compatibility.")
 
-    if tokenizer.pad_token_id is None:
-        if tokenizer.eos_token is not None:
-            tokenizer.pad_token = tokenizer.eos_token
-            model.config.pad_token_id = tokenizer.eos_token_id
+    if tokenizer.pad_token_id is None: 
+        raise ValueError("Tokenizer must have a pad_token_id for padding. Please ensure the tokenizer is properly configured and compatible with the model.")
+
 
     return tokenizer
 
@@ -486,7 +485,7 @@ class SFTMessagesTokenizerBuilder:
             except Exception:
                 # 如果某些 tokenizer 不支持上述参数或返回字段，则自动回退到长度差分方案。
                 pass
-
+        # if self.test: print(f"进入 _tokenize_with_assistant_mask: {messages}")
         # 先将完整多轮消息渲染为文本。
         full_text = self._apply_chat_template_text(messages)
 
@@ -524,7 +523,7 @@ class SFTMessagesTokenizerBuilder:
             for pos in range(start, end):
                 labels[pos] = input_ids[pos]     
 
-            if self.test: print(f"labels: {labels}")
+            if self.test: print(f"without_add_eos/bos_labels: {labels}")
 
         # 最后统一执行可选特殊 token 注入 + 定长截断/补齐。
         return self._finalize_sft_lengths(input_ids, labels)
@@ -558,7 +557,7 @@ class SFTMessagesTokenizerBuilder:
             # 在输入尾部追加 eos。
             input_ids = input_ids + [self.tokenizer.eos_token_id]
             # labels 尾部对应位置置为 -100。
-            labels = labels + [-100]
+            labels = labels + [self.tokenizer.eos_token_id]
 
         # 先按 max_length 截断 input_ids。
         input_ids = input_ids[: self.max_length]
@@ -575,6 +574,16 @@ class SFTMessagesTokenizerBuilder:
             labels = labels + [-100] * pad_len
 
         # 返回定长、已对齐的 input_ids 与 labels。
+        if self.test:
+            print(f"final_input_ids: {input_ids},\nfinal_labels: {labels}")
+            # 1. 将 labels 张量转为普通列表
+            labels_list = labels.tolist() if hasattr(labels, 'tolist') else labels
+            # 2. 过滤掉 -100 的无效标签
+            valid_labels = [token for token in labels_list if token != -100]
+            # 3. 安全解码（纯列表，无张量，无溢出）
+            decoded_label_text = self.tokenizer.decode(valid_labels, skip_special_tokens=True)
+            
+            print(f"✅ 有效Label反解码文本:。{decoded_label_text}。\n")
         return input_ids, labels
 
     
@@ -650,6 +659,7 @@ class SFTMessagesTokenizerBuilder:
         # 定义逐样本 map 函数，把 messages 转成训练字段。
         def _map_fn(example: Dict) -> Dict[str, List[int]]:
             # 对单条 messages 执行 tokenize 与 assistant-only 标签构建。
+            # if self.test: print("进入 _map_fn，example['messages']: ", example["messages"])
             input_ids, labels = self._tokenize_with_assistant_mask(example["messages"])
             # 生成 attention_mask：非 pad 为 1，pad 为 0。
             attention_mask = [1 if x != self.tokenizer.pad_token_id else 0 for x in input_ids]
@@ -659,13 +669,16 @@ class SFTMessagesTokenizerBuilder:
                 "labels": labels,
                 "attention_mask": attention_mask,
             }
+        
+        num_porc = min(8,len(dataset))
 
         # 对数据集执行逐样本映射，并移除原始列。
         tokenized_dataset = dataset.map(
             _map_fn,
             desc="Tokenizing SFT dataset",
             remove_columns=dataset.column_names,
-            num_proc=4,  # 使用 4 个进程并行处理
+            num_proc=num_porc,  # 使用 4 个进程并行处理
+            load_from_cache_file=None if not self.test else False,  # 测试时禁用缓存，确保每次都重新计算 tokenization
         )
 
         # 构建 SFT collator（labels 在 tokenize 阶段已完成语义化构建）。
@@ -720,6 +733,7 @@ def prepare_sft_dataset_from_messages(
     add_bos_at_start: bool = False,
     add_eos_at_end: bool = False,
     apply_chat_template: bool = True,
+    test = False,
 ) -> Tuple[Dataset, Callable]:
     """
     用途：SFT 数据的便捷封装函数，一行拿到 tokenized_dataset 与 collator。
@@ -744,6 +758,7 @@ def prepare_sft_dataset_from_messages(
         add_bos_at_start=add_bos_at_start,
         add_eos_at_end=add_eos_at_end,
         apply_chat_template=apply_chat_template,
+        test=test
     )
     # 调用 build 返回训练可直接使用的 dataset 与 collator。
     return builder.build(dataset)

@@ -20,13 +20,17 @@ TRAIN_TYPE = "SFT"  # 可选: "PT" / "SFT"
 
 # PT
 # MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2'
-# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_single/part_1.parquet"
+if TRAIN_TYPE == "PT":
+	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_single/part_1.parquet"
 # TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi/part_*.parquet"
 # TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi_permute_fullname/part_*.parquet"
 
 # SFT
 MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_2026_04_06_11_22_54'
-TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
+
+
+if TRAIN_TYPE == "SFT":
+	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
 
 OUTPUT_BASE_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints"
 
@@ -106,17 +110,17 @@ def get_sft_max_length_from_dataset(dataset: Dataset) -> int:
 	# 计算 >= max_text_len 的最小 2 的次幂
 	return 1 << (max_text_len - 1).bit_length()
 
-
-if IS_TEST:
-	MAX_LENGTH = 16
-
 	
 def part3_prepare_train_dataset(tokenizer, train_type: str):
 	"""按训练类型准备 tokenized dataset 与 data collator。"""
+
 	raw_dataset = load_dataset(
 		"parquet",
 		data_files={"train": TRAIN_PARQUET_PATH},
 	)["train"]
+
+	if IS_TEST:
+		raw_dataset = raw_dataset.select(range(min(2, len(raw_dataset))))
 
 	raw_dataset = raw_dataset.shuffle(seed=42)  # 先打乱原始数据，避免后续 chunk 时样本分布不均
 
@@ -149,6 +153,7 @@ def part3_prepare_train_dataset(tokenizer, train_type: str):
 			add_bos_at_start=ADD_EOS_AT_START,
 			add_eos_at_end=ADD_BOS_AT_END,
 			apply_chat_template=APPLY_CHAT_TEMPLATE,  # SFT 不使用 chat 模板，直接拼接 messages
+			test=IS_TEST,
 		)
 
 	raise ValueError(f"Unsupported TRAIN_TYPE={train_type}, expected PT or SFT")
@@ -182,6 +187,7 @@ def main():
 		f"columns={train_dataset.column_names}"
 	)
 
+
 	preview_collator_batch(train_dataset=train_dataset, data_collator=data_collator, preview_n=1)
 
 	if TRAIN_TYPE == "PT":
@@ -189,7 +195,8 @@ def main():
 		output_dir = os.path.join(OUTPUT_BASE_DIR, dataset_tag, MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
 	elif TRAIN_TYPE == "SFT":
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-3]
-		output_dir = os.path.join(OUTPUT_BASE_DIR, f"{dataset_tag}", "sft_" + MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
+		pt_datasets_type = MODEL_PATH.split("/")[-2]
+		output_dir = os.path.join(OUTPUT_BASE_DIR, f"{dataset_tag}", pt_datasets_type, "sft_" + MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
 	if IS_TEST:
 		output_dir += "_test"
 
@@ -251,6 +258,18 @@ def main():
 	trainer.log_metrics("train", metrics)
 	trainer.save_metrics("train", metrics)
 	trainer.save_state()
+
+	try:
+
+		import shutil
+
+		# 自动把 tokenizer 同步到所有检查点
+		latest_ckpt = max([os.path.join(output_dir, d) for d in os.listdir(output_dir) if d.startswith("checkpoint-")], key=os.path.getmtime)
+		for f in os.listdir(output_dir):
+			if "tokenizer" in f or "vocab" in f or "special_tokens" in f:
+				shutil.copy(os.path.join(output_dir, f), latest_ckpt)
+	except Exception as e:
+		print(f"自动同步 tokenizer 文件到最新 checkpoint 失败: {e}")
 
 
 if __name__ == "__main__":
