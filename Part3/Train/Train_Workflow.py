@@ -26,7 +26,7 @@ if TRAIN_TYPE == "PT":
 # TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi_permute_fullname/part_*.parquet"
 
 # SFT
-MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_2026_04_06_11_22_54'
+MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_2026_04_06_11_18_57'
 
 
 if TRAIN_TYPE == "SFT":
@@ -208,6 +208,8 @@ def main():
 		f"SCHEDULER={train_config['lr_scheduler_type']}, WARMUP_STEPS={train_config['warmup_steps']}, "
 		f"BF16={train_config['bf16']}, FP16={train_config['fp16']}"
 	)
+
+	# return 
 
 
 	training_args = TrainingArguments(

@@ -146,10 +146,10 @@ def evaluate_accuracy(
                     "sample_id": total,
                     "is_correct": ok,
                     "question": questions[j],
-                    "gold_answer": gold_answers[j],
-                    "pred_answer": pred_text,
-                    # "gold_answer_norm": gold_norm,
-                    # "pred_answer_norm": pred_norm,
+                    # "gold_answer": gold_answers[j],
+                    # "pred_answer": pred_text,
+                    "gold_answer_norm": gold_norm,
+                    "pred_answer_norm": pred_norm,
                 }
             )
 
