@@ -146,8 +146,8 @@ def evaluate_accuracy(
                     "sample_id": total,
                     "is_correct": ok,
                     "question": questions[j],
-                    # "gold_answer": gold_answers[j],
-                    # "pred_answer": pred_text,
+                    "gold_answer": gold_answers[j],
+                    "pred_answer": pred_text,
                     "gold_answer_norm": gold_norm,
                     "pred_answer_norm": pred_norm,
                 }
@@ -171,9 +171,11 @@ def main():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi_permute_fullname/sft_llama2_2026_04_06_11_22_54_2026_04_07_22_48_17/checkpoint-38000",
+        default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi/lora_llama2_2026_04_06_11_18_57_2026_04_08_22_18_35_merged",
         help="SFT checkpoint 路径",
     )
+    # /ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi_permute_fullname/lora_llama2_2026_04_06_11_22_54_2026_04_08_22_19_34_merged
+    # /ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_single/lora_llama2_2026_04_06_11_09_15_2026_04_08_22_19_52_merged
     parser.add_argument(
         "--test_dir",
         type=str,

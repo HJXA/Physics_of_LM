@@ -1,10 +1,13 @@
 import os
 import time
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
+# export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"  # 请根据实际情况调整 GPU 可见性
 
 from datasets import Dataset, load_dataset
-from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM
+from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM, Trainer
+from peft import LoraConfig, TaskType, get_peft_model, PeftModel
 
 from SwanLabTrainer import SwanLabTrainer
 import torch
@@ -14,7 +17,7 @@ from train_utils import preview_collator_batch, part3_prepare_sft_source_dataset
 
 
 IS_TEST = False
-TRAIN_TYPE = "SFT"  # 可选: "PT" / "SFT"
+TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
 
 
 
@@ -26,11 +29,15 @@ if TRAIN_TYPE == "PT":
 # TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi_permute_fullname/part_*.parquet"
 
 # SFT
-MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_2026_04_06_11_18_57'
+# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_2026_04_06_11_18_57'
+# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_2026_04_06_11_22_54'
+MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_2026_04_06_11_09_15'
 
-
-if TRAIN_TYPE == "SFT":
+if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
+
+LORA_RANK_EMBED = 128
+LORA_RANK_QV = 8
 
 OUTPUT_BASE_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints"
 
@@ -83,10 +90,19 @@ SFT_TRAIN_CONFIG = {
 	"fp16": False,
 }
 
+LORA_TRAIN_CONFIG = dict(SFT_TRAIN_CONFIG)
+
 
 def get_train_config(train_type: str, is_test: bool):
 	"""根据训练类型返回训练超参；测试模式下覆盖少量参数。"""
-	base_config = PT_TRAIN_CONFIG if train_type == "PT" else SFT_TRAIN_CONFIG
+	if train_type == "PT":
+		base_config = PT_TRAIN_CONFIG
+	elif train_type == "SFT":
+		base_config = SFT_TRAIN_CONFIG
+	elif train_type == "LORA":
+		base_config = LORA_TRAIN_CONFIG
+	else:
+		raise ValueError(f"Unsupported TRAIN_TYPE={train_type}, expected PT, SFT or LORA")
 	config = dict(base_config)
 
 	if is_test:
@@ -140,12 +156,12 @@ def part3_prepare_train_dataset(tokenizer, train_type: str):
 			drop_last_chunk=DROP_LAST_CHUNK,
 		)
 
-	if train_type == "SFT":
+	if train_type in {"SFT", "LORA"}:
 		sft_max_length = get_sft_max_length_from_dataset(raw_dataset)
-		print(f"SFT 动态 MAX_LENGTH（text 向上 2 次幂）: {sft_max_length}")
+		print(f"{train_type} 动态 MAX_LENGTH（text 向上 2 次幂）: {sft_max_length}")
 		print("此时的 MAX_LENGTH 配置（优先级高于动态计算）: ", MAX_LENGTH)
 		sft_source = part3_prepare_sft_source_dataset(raw_dataset)
-		print("SFT 数据预处理完成，样例: ", sft_source[:2])
+		print(f"{train_type} 数据预处理完成，样例: ", sft_source[:2])
 		return prepare_sft_dataset_from_messages(
 			dataset=sft_source,
 			tokenizer=tokenizer,
@@ -156,12 +172,47 @@ def part3_prepare_train_dataset(tokenizer, train_type: str):
 			test=IS_TEST,
 		)
 
-	raise ValueError(f"Unsupported TRAIN_TYPE={train_type}, expected PT or SFT")
+	raise ValueError(f"Unsupported TRAIN_TYPE={train_type}, expected PT, SFT or LORA")
+
+
+def apply_lora_to_model(model):
+	"""将 LoRA 注入到 embedding / q_proj / v_proj。"""
+	if hasattr(model, "config"):
+		model.config.use_cache = False
+	if hasattr(model, "enable_input_require_grads"):
+		model.enable_input_require_grads()
+
+	# 这里只对 3 个模块加 LoRA：输入 embedding、注意力里的 q_proj 和 v_proj。
+	# 其中 embedding 使用更大的秩 r'，q/v 使用较小的秩 r。
+	lora_config = LoraConfig(
+		task_type=TaskType.CAUSAL_LM,
+		r=LORA_RANK_QV,
+		lora_alpha=LORA_RANK_QV,
+		lora_dropout=0.0,
+		bias="none",
+		target_modules=["embed_tokens", "q_proj", "v_proj"],
+		rank_pattern={
+			# embedding 层用更大的秩，专门缓解 BIO 到 QA 的分布偏移。
+			"embed_tokens": LORA_RANK_EMBED,
+			# q/v 矩阵保持较小秩即可。
+			"q_proj": LORA_RANK_QV,
+			"v_proj": LORA_RANK_QV,
+		},
+		alpha_pattern={
+			# 与秩设置保持一致，避免不同模块的缩放不匹配。
+			"embed_tokens": LORA_RANK_EMBED,
+			"q_proj": LORA_RANK_QV,
+			"v_proj": LORA_RANK_QV,
+		},
+	)
+	model = get_peft_model(model, lora_config)
+	model.print_trainable_parameters()
+	return model
 
 def main():
 	train_type = str(TRAIN_TYPE).upper()
-	if train_type not in {"PT", "SFT"}:
-		raise ValueError(f"Unsupported TRAIN_TYPE={TRAIN_TYPE}, expected PT or SFT")
+	if train_type not in {"PT", "SFT", "LORA"}:
+		raise ValueError(f"Unsupported TRAIN_TYPE={TRAIN_TYPE}, expected PT, SFT or LORA")
 
 	set_seed(SEED)
 	train_config = get_train_config(train_type=train_type, is_test=IS_TEST)
@@ -172,6 +223,8 @@ def main():
 		dtype=torch.bfloat16,
 		device_map="auto",
 	)
+	if train_type == "LORA":
+		model = apply_lora_to_model(model)
 	tokenizer = build_tokenizer(model=model, model_path=MODEL_PATH)
 
 	print(
@@ -190,13 +243,14 @@ def main():
 
 	preview_collator_batch(train_dataset=train_dataset, data_collator=data_collator, preview_n=1)
 
-	if TRAIN_TYPE == "PT":
+	if train_type == "PT":
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-2]
 		output_dir = os.path.join(OUTPUT_BASE_DIR, dataset_tag, MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
-	elif TRAIN_TYPE == "SFT":
+	elif train_type in {"SFT", "LORA"}:
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-3]
 		pt_datasets_type = MODEL_PATH.split("/")[-2]
-		output_dir = os.path.join(OUTPUT_BASE_DIR, f"{dataset_tag}", pt_datasets_type, "sft_" + MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
+		mode_prefix = "lora_" if train_type == "LORA" else "sft_"
+		output_dir = os.path.join(OUTPUT_BASE_DIR, f"{dataset_tag}", pt_datasets_type, mode_prefix + MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
 	if IS_TEST:
 		output_dir += "_test"
 
@@ -261,17 +315,15 @@ def main():
 	trainer.save_metrics("train", metrics)
 	trainer.save_state()
 
-	try:
+	if train_type == "LORA":
 
-		import shutil
+		# model 已经是训练后的 PEFT 模型
+		# ⚡ 将 LoRA 权重 merge 回 base model
+		merged_model = model.merge_and_unload()
 
-		# 自动把 tokenizer 同步到所有检查点
-		latest_ckpt = max([os.path.join(output_dir, d) for d in os.listdir(output_dir) if d.startswith("checkpoint-")], key=os.path.getmtime)
-		for f in os.listdir(output_dir):
-			if "tokenizer" in f or "vocab" in f or "special_tokens" in f:
-				shutil.copy(os.path.join(output_dir, f), latest_ckpt)
-	except Exception as e:
-		print(f"自动同步 tokenizer 文件到最新 checkpoint 失败: {e}")
+		# 保存整个整合后的大模型
+		merged_model.save_pretrained(output_dir + "_merged")
+		tokenizer.save_pretrained(output_dir + "_merged")
 
 
 if __name__ == "__main__":

@@ -3,10 +3,15 @@
 set -e
 set -o pipefail
 
+
+export CUDA_VISIBLE_DEVICES=2
+
 # =========================
 # 可修改参数
 # =========================
-MODEL_ROOT="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi/sft_llama2_2026_04_06_11_18_57_2026_04_07_22_47_37"
+# MODEL_ROOT="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi/sft_llama2_2026_04_06_11_18_57_2026_04_08_18_35_45"
+# MODEL_ROOT="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi_permute_fullname/sft_llama2_2026_04_06_11_22_54_2026_04_08_18_31_31"
+MODEL_ROOT="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_single/sft_llama2_2026_04_06_11_09_15_2026_04_08_18_35_24"
 TEST_DIR="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/test"
 PY_SCRIPT="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/eval.py"
 RESULT_DIR="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/result"
@@ -15,7 +20,6 @@ BATCH_SIZE=8192
 MAX_INPUT_LENGTH=128
 MAX_NEW_TOKENS=32
 
-export CUDA_VISIBLE_DEVICES=2
 
 echo "======================================="
 echo "Start evaluation: $(date)"
