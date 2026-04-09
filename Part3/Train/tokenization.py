@@ -197,6 +197,7 @@ class PretrainTextTokenizerBuilder:
             batched=True,
             desc="Tokenizing pretraining dataset (no chunk)",
             remove_columns=dataset.column_names,
+            load_from_cache_file=False,  # 确保每次都重新计算 tokenization
         )
 
         # 返回 tokenized 后的数据集。
@@ -678,7 +679,7 @@ class SFTMessagesTokenizerBuilder:
             desc="Tokenizing SFT dataset",
             remove_columns=dataset.column_names,
             num_proc=num_porc,  # 使用 4 个进程并行处理
-            load_from_cache_file=None if not self.test else False,  # 测试时禁用缓存，确保每次都重新计算 tokenization
+            load_from_cache_file=False,  # 确保每次都重新计算 tokenization
         )
 
         # 构建 SFT collator（labels 在 tokenize 阶段已完成语义化构建）。

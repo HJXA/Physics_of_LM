@@ -14,6 +14,7 @@ import torch
 
 from tokenization import prepare_pretrain_dataset_from_text, prepare_sft_dataset_from_messages, build_tokenizer
 from train_utils import preview_collator_batch, part3_prepare_sft_source_dataset, part3_qa_text_to_messages
+from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoint
 
 
 IS_TEST = False
@@ -37,7 +38,7 @@ if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
 
 LORA_RANK_EMBED = 128
-LORA_RANK_QV = 8
+LORA_RANK_QV = 16
 
 OUTPUT_BASE_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints"
 
@@ -126,6 +127,19 @@ def get_sft_max_length_from_dataset(dataset: Dataset) -> int:
 	# 计算 >= max_text_len 的最小 2 的次幂
 	return 1 << (max_text_len - 1).bit_length()
 
+
+def format_scientific(value: float) -> str:
+	"""将浮点数格式化为适合目录名的科学计数法字符串。"""
+	return format(value, ".0e")
+
+
+def build_output_dir_tag(train_type: str, train_config: dict) -> str:
+	"""把关键训练超参编码到目录名里，便于区分不同实验。"""
+	tag = f"lr{format_scientific(train_config['learning_rate'])}_wd{format_scientific(train_config['weight_decay'])}"
+	if train_type == "LORA":
+		tag += f"_rank_embed{LORA_RANK_EMBED}_rank_qv{LORA_RANK_QV}"
+	return tag
+	
 	
 def part3_prepare_train_dataset(tokenizer, train_type: str):
 	"""按训练类型准备 tokenized dataset 与 data collator。"""
@@ -245,12 +259,21 @@ def main():
 
 	if train_type == "PT":
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-2]
-		output_dir = os.path.join(OUTPUT_BASE_DIR, dataset_tag, MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
+		output_dir = os.path.join(
+			OUTPUT_BASE_DIR,
+			dataset_tag,
+			f"{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config)}",
+		) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
 	elif train_type in {"SFT", "LORA"}:
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-3]
 		pt_datasets_type = MODEL_PATH.split("/")[-2]
 		mode_prefix = "lora_" if train_type == "LORA" else "sft_"
-		output_dir = os.path.join(OUTPUT_BASE_DIR, f"{dataset_tag}", pt_datasets_type, mode_prefix + MODEL_PATH.split("/")[-1]) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
+		output_dir = os.path.join(
+			OUTPUT_BASE_DIR,
+			f"{dataset_tag}",
+			pt_datasets_type,
+			f"{mode_prefix}{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config)}",
+		) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
 	if IS_TEST:
 		output_dir += "_test"
 
@@ -316,14 +339,21 @@ def main():
 	trainer.save_state()
 
 	if train_type == "LORA":
+		# 批量将所有 checkpoint 的 LoRA adapter 合并到 base model
+		merged_output_dir = output_dir + "_merged"
+		os.makedirs(merged_output_dir, exist_ok=True)
 
-		# model 已经是训练后的 PEFT 模型
-		# ⚡ 将 LoRA 权重 merge 回 base model
-		merged_model = model.merge_and_unload()
-
-		# 保存整个整合后的大模型
-		merged_model.save_pretrained(output_dir + "_merged")
-		tokenizer.save_pretrained(output_dir + "_merged")
+		checkpoints = find_checkpoints(output_dir)
+		if not checkpoints:
+			print(f"[LoRA Merge] 未找到任何 checkpoint-* 子目录，跳过合并")
+		else:
+			print(f"\n[LoRA Merge] 开始批量合并 {len(checkpoints)} 个 checkpoint → {merged_output_dir}")
+			for i, ckpt_path in enumerate(checkpoints, 1):
+				ckpt_name = os.path.basename(ckpt_path)
+				out_path = os.path.join(merged_output_dir, ckpt_name)
+				print(f"\n[{i}/{len(checkpoints)}] 合并 {ckpt_name} ...")
+				merge_single_checkpoint(ckpt_path, MODEL_PATH, out_path)
+			print(f"\n[LoRA Merge] 全部 {len(checkpoints)} 个 checkpoint 合并完成！保存至: {merged_output_dir}")
 
 
 if __name__ == "__main__":

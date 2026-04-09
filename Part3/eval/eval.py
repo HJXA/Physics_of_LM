@@ -1,14 +1,12 @@
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "3"  # 请根据实际情况调整 GPU 可见性
+
 import re
 import json
 import argparse
 from datetime import datetime
 from typing import List, Dict, Tuple
 
-import torch
-from datasets import load_dataset
-from transformers import AutoTokenizer, AutoModelForCausalLM
+
 
 DEBUG = False
 
@@ -72,98 +70,7 @@ def save_metrics_txt(output_path: str, lines: List[str]) -> None:
         f.write("\n".join(lines) + "\n")
 
 
-@torch.no_grad()
-def evaluate_accuracy(
-    model,
-    tokenizer,
-    examples: List[Dict],
-    batch_size: int,
-    max_input_length: int,
-    max_new_tokens: int,
-    device: torch.device,
-    verbose_errors: int = 0,
-) -> Tuple[float, List[Dict[str, object]]]:
-    total = 0
-    correct = 0
-    shown = 0
-    per_sample_records: List[Dict[str, object]] = []
 
-    for i in range(0, len(examples), batch_size):
-        batch = examples[i:i + batch_size]
-
-        questions = []
-        gold_answers = []
-        for ex in batch:
-            q, a = extract_qa_from_example(ex)
-            questions.append(q)
-            gold_answers.append(a)
-
-        # 贴合当前 SFT 训练格式：训练时是 Question + Answer，评测时只给 Question 让模型续写答案
-        prompts = questions
-        if DEBUG: print("prompts: ", prompts)
-
-        enc = tokenizer(
-            prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=max_input_length,
-        )
-        if DEBUG: print("enc: ", enc)
-        enc = {k: v.to(device) for k, v in enc.items()}
-
-        outputs = model.generate(
-            **enc,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            num_beams=1,
-            pad_token_id=tokenizer.pad_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-        )
-
-        if DEBUG: print("outputs: ", outputs)
-
-        prompt_len = enc["input_ids"].shape[1]
-        gen_ids_batch = outputs[:, prompt_len:]
-        pred_texts = tokenizer.batch_decode(gen_ids_batch, skip_special_tokens=True)
-
-        for j in range(len(batch)):
-            gen_ids = gen_ids_batch[j]
-            if DEBUG: print(f"Sample {j + 1} - gen_ids: {gen_ids}")
-            pred_text = pred_texts[j]
-            if DEBUG: print(f"Sample {j + 1} - Predicted answer: '{pred_text}', Gold answer: '{gold_answers[j]}'")
-
-            pred_norm = normalize_answer(pred_text)
-            gold_norm = normalize_answer(gold_answers[j])
-
-            ok = pred_norm == gold_norm
-            total += 1
-            if ok:
-                correct += 1
-
-            per_sample_records.append(
-                {
-                    "sample_id": total,
-                    "is_correct": ok,
-                    "question": questions[j],
-                    "gold_answer": gold_answers[j],
-                    "pred_answer": pred_text,
-                    "gold_answer_norm": gold_norm,
-                    "pred_answer_norm": pred_norm,
-                }
-            )
-
-            if (not ok) and shown < verbose_errors:
-                shown += 1
-                print(f"\n[样本 {total} 错误示例]")
-                print(f"Q: {questions[j]}")
-                print(f"Gold(raw): {gold_answers[j]}")
-                print(f"Pred(raw): {pred_text}")
-                print(f"Gold(norm): {gold_norm}")
-                print(f"Pred(norm): {pred_norm}")
-
-    acc = correct / total if total > 0 else 0.0
-    return acc, per_sample_records
 
 
 def main():
@@ -171,11 +78,12 @@ def main():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi/lora_llama2_2026_04_06_11_18_57_2026_04_08_22_18_35_merged",
+        default=None,
         help="SFT checkpoint 路径",
     )
-    # /ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_multi_permute_fullname/lora_llama2_2026_04_06_11_22_54_2026_04_08_22_19_34_merged
-    # /ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA/bioS_single/lora_llama2_2026_04_06_11_09_15_2026_04_08_22_19_52_merged
+    parser.add_argument("--gpu_id", type=int, default=0, help="使用的 GPU 编号")
+
+
     parser.add_argument(
         "--test_dir",
         type=str,
@@ -194,6 +102,106 @@ def main():
         help="评测结果输出目录",
     )
     args = parser.parse_args()
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
+    import torch
+    from datasets import load_dataset
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+
+    @torch.no_grad()
+    def evaluate_accuracy(
+        model,
+        tokenizer,
+        examples: List[Dict],
+        batch_size: int,
+        max_input_length: int,
+        max_new_tokens: int,
+        device: torch.device,
+        verbose_errors: int = 0,
+    ) -> Tuple[float, List[Dict[str, object]]]:
+        total = 0
+        correct = 0
+        shown = 0
+        per_sample_records: List[Dict[str, object]] = []
+
+        for i in range(0, len(examples), batch_size):
+            batch = examples[i:i + batch_size]
+
+            questions = []
+            gold_answers = []
+            for ex in batch:
+                q, a = extract_qa_from_example(ex)
+                questions.append(q)
+                gold_answers.append(a)
+
+            # 贴合当前 SFT 训练格式：训练时是 Question + Answer，评测时只给 Question 让模型续写答案
+            prompts = questions
+            if DEBUG: print("prompts: ", prompts)
+
+            enc = tokenizer(
+                prompts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=max_input_length,
+            )
+            if DEBUG: print("enc: ", enc)
+            enc = {k: v.to(device) for k, v in enc.items()}
+
+            outputs = model.generate(
+                **enc,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                num_beams=1,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+            )
+
+            if DEBUG: print("outputs: ", outputs)
+
+            prompt_len = enc["input_ids"].shape[1]
+            gen_ids_batch = outputs[:, prompt_len:]
+            pred_texts = tokenizer.batch_decode(gen_ids_batch, skip_special_tokens=True)
+
+            if DEBUG: print("pred_texts: ", pred_texts)
+
+            for j in range(len(batch)):
+                gen_ids = gen_ids_batch[j]
+                if DEBUG: print(f"Sample {j + 1} - gen_ids: {gen_ids}")
+                pred_text = pred_texts[j]
+                if DEBUG: print(f"Sample {j + 1} - Predicted answer: '{pred_text}', Gold answer: '{gold_answers[j]}'")
+
+                pred_norm = normalize_answer(pred_text)
+                gold_norm = normalize_answer(gold_answers[j])
+
+                ok = pred_norm == gold_norm
+                total += 1
+                if ok:
+                    correct += 1
+
+                per_sample_records.append(
+                    {
+                        "sample_id": total,
+                        "is_correct": ok,
+                        "question": questions[j],
+                        "gold_answer": gold_answers[j],
+                        "pred_answer": pred_text,
+                        "gold_answer_norm": gold_norm,
+                        "pred_answer_norm": pred_norm,
+                    }
+                )
+
+                if (not ok) and shown < verbose_errors:
+                    shown += 1
+                    print(f"\n[样本 {total} 错误示例]")
+                    print(f"Q: {questions[j]}")
+                    print(f"Gold(raw): {gold_answers[j]}")
+                    print(f"Pred(raw): {pred_text}")
+                    print(f"Gold(norm): {gold_norm}")
+                    print(f"Pred(norm): {pred_norm}")
+
+        acc = correct / total if total > 0 else 0.0
+        return acc, per_sample_records
 
     parquet_glob = os.path.join(args.test_dir, "*.parquet")
     ds = load_dataset("parquet", data_files={"test": parquet_glob})["test"]
@@ -222,6 +230,11 @@ def main():
         model.to(device)
     model.eval()
 
+    if DEBUG:
+        examples = examples[:2]
+        args.batch_size = 1
+    
+
     full_acc, records = evaluate_accuracy(
         model=model,
         tokenizer=tokenizer,
@@ -240,18 +253,20 @@ def main():
     jsonl_path = os.path.join(args.result_dir,model_type,model_name, checkpoint_name,f"predictions_{ts}.jsonl")
     txt_path = os.path.join(args.result_dir, model_type, model_name, checkpoint_name, f"metrics_{ts}.txt")
 
-    save_jsonl(records, jsonl_path)
-    metric_lines = [
-        f"time={ts}",
-        f"model_path={args.model_path}",
-        f"test_dir={args.test_dir}",
-        f"n={len(examples)}",
-        f"accuracy={full_acc:.6f}",
-        f"batch_size={args.batch_size}",
-        f"max_input_length={args.max_input_length}",
-        f"max_new_tokens={args.max_new_tokens}",
-    ]
-    save_metrics_txt(txt_path, metric_lines)
+    if not DEBUG:
+
+        save_jsonl(records, jsonl_path)
+        metric_lines = [
+            f"time={ts}",
+            f"model_path={args.model_path}",
+            f"test_dir={args.test_dir}",
+            f"n={len(examples)}",
+            f"accuracy={full_acc:.6f}",
+            f"batch_size={args.batch_size}",
+            f"max_input_length={args.max_input_length}",
+            f"max_new_tokens={args.max_new_tokens}",
+        ]
+        save_metrics_txt(txt_path, metric_lines)
 
     print(f"[Eval] n={len(examples)}, accuracy={full_acc:.4f}")
     print(f"[Eval] per-sample outputs saved to: {jsonl_path}")
