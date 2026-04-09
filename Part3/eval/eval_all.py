@@ -5,7 +5,7 @@ import subprocess
 import re
 import argparse
 from collections import defaultdict
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 
 import matplotlib
 matplotlib.use("Agg")
@@ -51,36 +51,42 @@ def get_checkpoints_to_eval():
 
 
 def _run_single_eval(task):
-    """子进程 worker：在指定 GPU 上调用 eval.py 评测单个 checkpoint。"""
-    model_path, gpu_id, test_dir, batch_size, max_input_length, max_new_tokens = task
+    """子进程 worker：从共享 GPU 队列中获取空闲 GPU，执行评测后归还。"""
+    model_path, test_dir, batch_size, max_input_length, max_new_tokens, gpu_queue = task
 
-    cmd = [
-        sys.executable, EVAL_SCRIPT,
-        "--model_path", model_path,
-        "--gpu_id", str(gpu_id),
-        "--test_dir", test_dir,
-        "--batch_size", str(batch_size),
-        "--max_input_length", str(max_input_length),
-        "--max_new_tokens", str(max_new_tokens),
-    ]
+    # 从队列中获取一个空闲 GPU（阻塞等待）
+    gpu_id = gpu_queue.get()
+    try:
+        cmd = [
+            sys.executable, EVAL_SCRIPT,
+            "--model_path", model_path,
+            "--gpu_id", str(gpu_id),
+            "--test_dir", test_dir,
+            "--batch_size", str(batch_size),
+            "--max_input_length", str(max_input_length),
+            "--max_new_tokens", str(max_new_tokens),
+        ]
 
-    tag = f"[GPU{gpu_id}] {os.path.basename(os.path.dirname(model_path))}/{os.path.basename(model_path)}"
-    print(f"  {tag} 开始评测...")
+        tag = f"[GPU{gpu_id}] {os.path.basename(os.path.dirname(model_path))}/{os.path.basename(model_path)}"
+        print(f"  {tag} 开始评测...")
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"  {tag} [ERROR]")
-        print(result.stderr[-500:] if len(result.stderr) > 500 else result.stderr)
-        return (model_path, False, None)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"  {tag} [ERROR]")
+            print(result.stderr[-500:] if len(result.stderr) > 500 else result.stderr)
+            return (model_path, False, None)
 
-    acc = None
-    for line in result.stdout.strip().split("\n"):
-        if "accuracy=" in line:
-            print(f"  {tag} {line.strip()}")
-            m = re.search(r"accuracy=([\d.]+)", line)
-            if m:
-                acc = float(m.group(1))
-    return (model_path, True, acc)
+        acc = None
+        for line in result.stdout.strip().split("\n"):
+            if "accuracy=" in line:
+                print(f"  {tag} {line.strip()}")
+                m = re.search(r"accuracy=([\d.]+)", line)
+                if m:
+                    acc = float(m.group(1))
+        return (model_path, True, acc)
+    finally:
+        # 评测完成后归还 GPU，让下一个任务可以使用
+        gpu_queue.put(gpu_id)
 
 
 def collect_results():
@@ -172,10 +178,9 @@ def main():
         print(f"使用 {NUM_GPUS} 个 GPU 并行评测")
         print(f"{'='*70}\n")
 
-        # 构建任务列表，轮询分配 GPU（跳过已有评测结果的 checkpoint）
+        # 构建任务列表（GPU 动态分配，无需预分配）
         all_tasks = []
         skipped = 0
-        gpu_idx = 0
         for exp_dir, ckpts in sorted(eval_experiments.items()):
             for ckpt in sorted(ckpts):
                 # 检查是否已有评测结果
@@ -190,19 +195,28 @@ def main():
 
                 all_tasks.append((
                     ckpt,
-                    gpu_idx % NUM_GPUS,
                     args.test_dir,
                     args.batch_size,
                     args.max_input_length,
                     args.max_new_tokens,
+                    None,  # gpu_queue 占位，下面统一填入
                 ))
-                gpu_idx += 1
 
         if skipped > 0:
             print(f"跳过 {skipped} 个已有评测结果的 checkpoint")
         print(f"实际待评测: {len(all_tasks)} 个 checkpoint\n")
 
-        # 使用进程池并行执行
+        # 创建共享 GPU 队列，初始放入所有可用 GPU ID
+        manager = Manager()
+        gpu_queue = manager.Queue()
+        for g in range(NUM_GPUS):
+            gpu_queue.put(g)
+
+        # 将 gpu_queue 填入每个任务
+        all_tasks = [(ckpt, td, bs, mil, mnt, gpu_queue)
+                     for ckpt, td, bs, mil, mnt, _ in all_tasks]
+
+        # 使用进程池并行执行，GPU 动态调度：哪个先完成就先领下一个
         with Pool(processes=NUM_GPUS) as pool:
             results_list = pool.map(_run_single_eval, all_tasks)
 
