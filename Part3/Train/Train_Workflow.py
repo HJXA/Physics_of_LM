@@ -3,7 +3,7 @@ import time
 
 # export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
 
 from datasets import Dataset, load_dataset
 from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM, Trainer
@@ -18,24 +18,28 @@ from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoi
 
 
 IS_TEST = False
-TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
+TRAIN_TYPE = "PT"  # 可选: "PT" / "SFT" / "LORA"
 
 
 
 # PT
 # MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2'
 if TRAIN_TYPE == "PT":
-	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_single/part_1.parquet"
-# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi/part_*.parquet"
-# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi_permute_fullname/part_*.parquet"
+	# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_single/part_1.parquet"
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2'
+	# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi/part_*.parquet"
+	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi_permute_fullname/part_*.parquet"
 
-# SFT
-# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_2026_04_06_11_18_57'
-# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_2026_04_06_11_22_54'
-MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_2026_04_06_11_09_15'
+
+
 
 if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_2026_04_06_11_09_15'
+
+	# SFT
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_2026_04_06_11_18_57'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_2026_04_06_11_22_54'
 
 LORA_RANK_EMBED = 128
 LORA_RANK_QV = 16

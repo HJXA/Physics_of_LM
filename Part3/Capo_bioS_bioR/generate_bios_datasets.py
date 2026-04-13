@@ -243,7 +243,7 @@ def build_base_records(num_samples: int, seed: int) -> list[dict]:
         row["variant_index"] = 1
         # 生成文本字段。
         # base 阶段固定模板，保证每条样本使用同一组句式结构。
-        row["text"] = render_single_bio(person, fixed_templates=True)
+        row["text"] = render_single_bio(person, fixed_templates=False)
         # 追加到结果列表。
         records.append(row)
     # 返回基础记录。

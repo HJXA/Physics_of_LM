@@ -15,17 +15,17 @@ import pickle
 from pathlib import Path
 
 try:
-    from utils.Layer_Hidden import Layer_Hidden_Train
-    from utils.Coe_Scores_Batch import CoEScoreInfo_Train as CoEScoreInfo_Batch
-except ModuleNotFoundError:
     import sys
 
-    project_root = Path(__file__).resolve().parents[3]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+    sys.path.append("/ruilab/jxhe/CoE_Monitor/utils")
 
+    from Layer_Hidden import Layer_Hidden_Train
+    from Coe_Scores_Batch import CoEScoreInfo_Train as CoEScoreInfo_Batch
+    
+except ModuleNotFoundError:
     from utils.Layer_Hidden import Layer_Hidden_Train
     from utils.Coe_Scores_Batch import CoEScoreInfo_Train as CoEScoreInfo_Batch
+    
 
 
 import swanlab

@@ -14,13 +14,13 @@ def part3_qa_text_to_messages(text: str):
 	text = str(text).strip()
 
 	if "Answer:" in text:
-		question, answer = text.split("Answer: ", 1) # 去除Answer字样
-		question = question.strip() 
-		answer = answer.strip().strip(".")
-		# idx = text.index("Answer:") # 不去除
-		# question = text[:idx].strip()
-		# answer = text[idx:].strip().strip('.')
-		# print(f"Parsed QA - Question: '{question}', Answer: '{answer}'")
+		# question, answer = text.split("Answer: ", 1) # 去除Answer字样 # 会导致结果大面积
+		# question = question.strip() 
+		# answer = answer.strip().strip(".")
+		idx = text.index("Answer:") # 不去除
+		question = text[:idx].strip()
+		answer = text[idx:].strip().strip('.')
+		print(f"Parsed QA - Question: '{question}', Answer: '{answer}'")
 	else:
 		question = text
 		answer = ""

@@ -120,6 +120,38 @@ def collect_results():
     return dict(results)
 
 
+def _map_legend_name(model_name):
+    """将复杂的模型名称映射为图例中简洁的标签。
+
+    LoRA qv8 → lora_llama2_rank_qv8
+    LoRA qv16_04_09_11 merged → lora_llama2_rank_qv16
+    LoRA qv16_04_09_14 merged → lora_llama2_rank_qv16_no_answer
+    SFT answer → sft_llama2_answer
+    SFT no_answer → sft_llama2_no_answer
+    """
+    # LoRA qv8
+    if model_name.startswith("lora_llama2"):
+        if "_rank_qv8_" in model_name:
+            return "lora_llama2_rank_qv8"
+        elif "_rank_qv16_" in model_name:
+            label = "lora_llama2_rank_qv16"
+            # 04_09_14xx → no_answer
+            if "_2026_04_09_14" in model_name:
+                label += "_no_answer"
+            return label
+        else:
+            return model_name
+
+    # SFT: extract sft_llama2 + answer flag
+    if model_name.startswith("sft_llama2"):
+        if "_no_answer_" in model_name:
+            return "sft_llama2_no_answer"
+        else:
+            return "sft_llama2_answer"
+
+    return model_name
+
+
 def plot_results(results, plot_dir):
     """每个 model_type 一张图，横轴 step，纵轴 accuracy，不同实验为不同曲线。"""
     os.makedirs(plot_dir, exist_ok=True)
@@ -136,10 +168,7 @@ def plot_results(results, plot_dir):
             steps = sorted(steps_dict.keys())
             accs = [steps_dict[s] for s in steps]
 
-            # 显示标签：去掉 _merged 后缀
-            label = model_name
-            if label.endswith("_merged"):
-                label = label[:-7]
+            label = _map_legend_name(model_name)
 
             ax.plot(steps, accs, marker="o", label=label, linewidth=2, markersize=6)
 
