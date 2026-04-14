@@ -18,15 +18,16 @@ from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoi
 
 
 IS_TEST = False
-TRAIN_TYPE = "PT"  # 可选: "PT" / "SFT" / "LORA"
+TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
 
 
 
 # PT
 # MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2'
 if TRAIN_TYPE == "PT":
-	# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_single/part_1.parquet"
 	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2'
+
+	# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_single/part_1.parquet"
 	# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi/part_*.parquet"
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi_permute_fullname/part_*.parquet"
 
@@ -35,11 +36,10 @@ if TRAIN_TYPE == "PT":
 
 if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
-	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_2026_04_06_11_09_15'
 
-	# SFT
-	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_2026_04_06_11_18_57'
-	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_2026_04_06_11_22_54'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_lr1e-03_wd1e-01_2026_04_13_22_00_10'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_07'
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_59'
 
 LORA_RANK_EMBED = 128
 LORA_RANK_QV = 16

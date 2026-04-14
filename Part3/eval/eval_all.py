@@ -136,7 +136,7 @@ def _map_legend_name(model_name):
         elif "_rank_qv16_" in model_name:
             label = "lora_llama2_rank_qv16"
             # 04_09_14xx → no_answer
-            if "_2026_04_09_14" in model_name:
+            if "_2026_04_14_17" in model_name:
                 label += "_no_answer"
             return label
         else:
