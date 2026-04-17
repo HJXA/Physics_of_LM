@@ -522,6 +522,86 @@ def generate_qa(base_records: list[dict], datasets_root: str, samples_root: str,
             save_text_parquet(test_texts, test_parquet_path, datasets_root, samples_root, n_samples)
 
 
+def generate_probing(base_records: list[dict], datasets_root: str, samples_root: str, n_samples: int):
+    """生成 P-probing 与 Q-probing 数据集。
+
+    P-probing：输入为完整传记文本，输出为 6 个属性标签。
+    Q-probing：输入仅为人名，输出为 6 个属性标签。
+
+    共同的 6 个输出属性：
+    - birth_date: 出生日期（如 "April 8, 1935"）
+    - birthcity: 出生城市
+    - university: 毕业院校
+    - field: 专业
+    - company1name: 公司名
+    - company1city: 公司城市
+
+    train/test 划分严格与 QA 一致：QA train 中的人名归 probing train，QA test 中的归 probing test。
+    """
+    # 从已保存的 QA parquet 中提取 train/test 人名集合，保证严格对齐。
+    qa_train_path = os.path.join(datasets_root, "QA", "train", "q1_birth_date.parquet")
+    qa_test_path = os.path.join(datasets_root, "QA", "test", "q1_birth_date.parquet")
+    qa_train_df = pd.read_parquet(qa_train_path)
+    qa_test_df = pd.read_parquet(qa_test_path)
+
+    # 从 QA 文本中提取全名。
+    def extract_name(text: str) -> str:
+        m = re.match(r"(?:What|Which|Where).*?of (.+?)\?", text)
+        if m:
+            return m.group(1)
+        raise ValueError(f"无法从 QA 文本中提取全名: {text[:80]}")
+
+    train_names = set(extract_name(t) for t in qa_train_df["text"])
+    test_names = set(extract_name(t) for t in qa_test_df["text"])
+
+    # 6 个公共属性字段。
+    def _attrs(r: dict) -> dict:
+        return {
+            "birth_date": f"{r['birthmonth']} {r['birthday']}, {r['birthyear']}",
+            "birthcity": r["birthcity"],
+            "university": r["university"],
+            "field": r["field"],
+            "company1name": r["company1name"],
+            "company1city": r["company1city"],
+        }
+
+    # P-probing 记录：输入为传记文本。
+    p_all: list[dict] = [{"text": r["text"].strip(), **_attrs(r)} for r in base_records]
+    # Q-probing 记录：输入仅为人名。
+    q_all: list[dict] = [{"text": r["full_name"], **_attrs(r)} for r in base_records]
+
+    # 按人名严格划分。
+    full_names = [r["full_name"] for r in base_records]
+
+    for tag, all_records in [("P-probing", p_all), ("Q-probing", q_all)]:
+        train_records = [rec for rec, name in zip(all_records, full_names) if name in train_names]
+        test_records = [rec for rec, name in zip(all_records, full_names) if name in test_names]
+
+        # 保存 train 集。
+        train_path = os.path.join(datasets_root, "probing", tag, "train", "data.parquet")
+        os.makedirs(os.path.dirname(train_path), exist_ok=True)
+        pd.DataFrame(train_records).to_parquet(train_path, index=False)
+        # 导出 train 样本。
+        train_sample_path = os.path.join(samples_root, "probing", tag, "train", "data.json")
+        os.makedirs(os.path.dirname(train_sample_path), exist_ok=True)
+        with open(train_sample_path, "w", encoding="utf-8") as f:
+            json.dump(train_records[: min(n_samples, len(train_records))], f, ensure_ascii=False, indent=2)
+
+        # 保存 test 集。
+        test_path = os.path.join(datasets_root, "probing", tag, "test", "data.parquet")
+        os.makedirs(os.path.dirname(test_path), exist_ok=True)
+        pd.DataFrame(test_records).to_parquet(test_path, index=False)
+        # 导出 test 样本。
+        test_sample_path = os.path.join(samples_root, "probing", tag, "test", "data.json")
+        os.makedirs(os.path.dirname(test_sample_path), exist_ok=True)
+        with open(test_sample_path, "w", encoding="utf-8") as f:
+            json.dump(test_records[: min(n_samples, len(test_records))], f, ensure_ascii=False, indent=2)
+
+        # 打印统计信息。
+        print(f"  {tag} train: {len(train_records)} 条 -> {train_path}")
+        print(f"  {tag} test:  {len(test_records)} 条 -> {test_path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """参数解析。"""
     # 初始化命令行参数解析器。
@@ -589,14 +669,14 @@ def main():
     print("=" * 72)
 
     # 1) 先生成 base：bioS_single。
-    print("\n[1/4] 生成 bioS_single(base)")
+    print("\n[1/5] 生成 bioS_single(base)")
     # 合成基础记录。
     base_records = build_base_records(args.num_samples, args.seed)
     # 同步保存 dict/text 两个版本。
     save_dual_dataset(base_records, datasets_root, samples_root, "bioS_single", 1, args.show_samples)
 
     # 2) 从刚保存的 dict 回读，保证后续增强严格基于落盘数据。
-    print("\n[2/4] 回读 base dict")
+    print("\n[2/5] 回读 base dict")
     # base dict parquet 路径。
     base_path = os.path.join(datasets_root, "dict", "bioS_single", "part_1.parquet")
     # 回读为 list[dict]。
@@ -605,7 +685,7 @@ def main():
     print(f"已回读: {base_path} ({len(base_records)} 条)")
 
     # 3) 生成 single 与 multi 全部规则增强。
-    print("\n[3/4] 生成 single/multi 增强")
+    print("\n[3/5] 生成 single/multi 增强")
     # 生成 single 系列增强。
     generate_single_augments(
         base_records=base_records,
@@ -626,16 +706,20 @@ def main():
     )
 
     # 4) 从原始 base 信息出发生成六类 QA。
-    print("\n[4/4] 生成 QA")
+    print("\n[4/5] 生成 QA")
     # 保存 QA 数据与对应样本。
     generate_qa(base_records, datasets_root, samples_root, args.show_samples, qa_layout=args.qa_layout)
+
+    # 5) 生成 p-probing 数据集。
+    print("\n[5/5] 生成 p-probing 数据集")
+    generate_probing(base_records, datasets_root, samples_root, args.show_samples)
 
     # 打印完成信息。
     print("\n" + "=" * 72)
     # 打印完成标志。
     print("完成")
     # 打印目录说明。
-    print("dict: datasets/dict/... | text: datasets/text/... | QA: datasets/QA/... | samples: datasets/samples/...")
+    print("dict: datasets/dict/... | text: datasets/text/... | QA: datasets/QA/... | probing: datasets/probing/... | samples: datasets/samples/...")
     # 打印收尾分隔线。
     print("=" * 72)
 
