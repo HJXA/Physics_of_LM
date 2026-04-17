@@ -17,8 +17,8 @@ import time
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 # 让 probing/ 能 import Train/ 下的模块
-PART3_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.insert(0, os.path.join(PART3_ROOT, "Train"))
+
+sys.path.append("/ruilab/jxhe/CoE_Monitor/Physics_of_LM")
 
 import torch
 import torch.nn as nn
@@ -26,8 +26,8 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, Trainer, TrainingArguments, set_seed
 import swanlab
 
-from tokenization import build_tokenizer
-from train_utils import preview_collator_batch
+from Part3.Train.tokenization import build_tokenizer
+from Part3.Train.train_utils import preview_collator_batch
 
 
 # ======== 配置 ========
