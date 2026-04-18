@@ -12,6 +12,8 @@ import re
 import time
 import os
 import pickle
+import gzip
+import io
 from pathlib import Path
 
 try:
@@ -124,8 +126,11 @@ class SwanLabTrainer(Trainer):
                         task_type = item.get("type")
                         
                         if task_type == "tensor":
-                            # 处理 Tensor 保存
-                            torch.save(item["data"], item["path"])
+                            buf = io.BytesIO()
+                            with gzip.GzipFile(fileobj=buf, mode='wb') as f:
+                                torch.save(item["data"], f)
+                            with open(item["path"], 'wb') as f:
+                                f.write(buf.getvalue())
                             
                         elif task_type == "coe":
                             # 处理 CoE 保存
@@ -442,12 +447,10 @@ class SwanLabTrainer(Trainer):
             print("当前标签张量形状(labels.shape):", current_labels.shape)
             print("标签中忽略位(-100)占比:", (current_labels == -100).float().mean())
 
+        if not self.CoE_Flag:
+            return (loss, outputs) if return_outputs else loss
 
-    
-
-        
-
-        layer_hidden_state = Layer_Hidden_Train(outputs.hidden_states, labels = current_labels,eos_token_id=getattr(self.model.config, 'eos_token_id', None),pad_token_id=getattr(self.model.config, 'pad_token_id', None), steps = self.step_count, rank = self.accelerator.process_index, input_ids = inputs.get('input_ids'),train_type=self.train_type)
+        layer_hidden_state = Layer_Hidden_Train(outputs.hidden_states, labels = current_labels,eos_token_id=getattr(self.model.config, 'eos_token_id', None),pad_token_id=getattr(self.model.config, 'pad_token_id', None), steps = self.step_count, rank = self.accelerator.process_index, input_ids = inputs.get('input_ids'))
         # (Batch_Real, Layer, Hidden_Dim)
         if layer_hidden_state is not None:
 
@@ -463,13 +466,13 @@ class SwanLabTrainer(Trainer):
 
             save_path = os.path.join(
                 self.save_layer_hidden_root,
-                f"Step{self.step_count}_Rank{self.rank}.pt"
+                f"Step{self.step_count}_Rank{self.rank}.pt.gz"
             )
 
             tensor_to_save = (
                 layer_hidden_state[:10]
                 .detach()
-                .to(torch.bfloat16)   # 强烈建议压缩
+                .to(torch.float8_e4m3fn)
                 .cpu()
             )
             if self.step_count == 1 and self.rank == 0:

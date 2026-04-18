@@ -3,7 +3,7 @@ import time
 
 # export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"  # 请根据实际情况调整 GPU 可见性
 
 from datasets import Dataset, load_dataset
 from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM, Trainer
@@ -19,6 +19,17 @@ from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoi
 
 IS_TEST = False
 TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
+DATA_MODE = "no_answer"  # 可选: "no_answer" / "#" / "attribute" / "raw"
+
+# SFT/LORA 专用：指定要训练的 QA 属性文件列表，为空或 None 时使用 TRAIN_PARQUET_PATH 的 glob
+TRAIN_QA_FILES = [
+	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q1_birth_date.parquet",
+	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q2_birth_city.parquet",
+	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q3_university.parquet",
+	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q4_major.parquet",
+	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q5_company.parquet",
+	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q6_company_city.parquet",
+]
 
 
 
@@ -137,20 +148,36 @@ def format_scientific(value: float) -> str:
 	return format(value, ".0e")
 
 
-def build_output_dir_tag(train_type: str, train_config: dict) -> str:
+def build_output_dir_tag(train_type: str, train_config: dict, mode: str = None, qa_files: list = None) -> str:
 	"""把关键训练超参编码到目录名里，便于区分不同实验。"""
 	tag = f"lr{format_scientific(train_config['learning_rate'])}_wd{format_scientific(train_config['weight_decay'])}"
 	if train_type == "LORA":
 		tag += f"_rank_embed{LORA_RANK_EMBED}_rank_qv{LORA_RANK_QV}"
+	if mode:
+		tag += f"_mode_{mode}"
+	if qa_files:
+		# 从文件名提取属性：q1_birth_date.parquet → birth_date
+		attrs = []
+		for f in qa_files:
+			name = os.path.splitext(os.path.basename(f))[0]  # q1_birth_date
+			parts = name.split("_", 1)  # ["q1", "birth_date"]
+			attrs.append(parts[1] if len(parts) > 1 else name)
+		tag += f"_qa{'_'.join(attrs)}"
 	return tag
 	
 	
 def part3_prepare_train_dataset(tokenizer, train_type: str):
 	"""按训练类型准备 tokenized dataset 与 data collator。"""
 
+	# SFT/LORA 优先使用 TRAIN_QA_FILES 列表
+	if train_type in {"SFT", "LORA"} and TRAIN_QA_FILES:
+		data_path = TRAIN_QA_FILES
+	else:
+		data_path = TRAIN_PARQUET_PATH
+
 	raw_dataset = load_dataset(
 		"parquet",
-		data_files={"train": TRAIN_PARQUET_PATH},
+		data_files={"train": data_path},
 	)["train"]
 
 	if IS_TEST:
@@ -178,7 +205,7 @@ def part3_prepare_train_dataset(tokenizer, train_type: str):
 		sft_max_length = get_sft_max_length_from_dataset(raw_dataset)
 		print(f"{train_type} 动态 MAX_LENGTH（text 向上 2 次幂）: {sft_max_length}")
 		print("此时的 MAX_LENGTH 配置（优先级高于动态计算）: ", MAX_LENGTH)
-		sft_source = part3_prepare_sft_source_dataset(raw_dataset)
+		sft_source = part3_prepare_sft_source_dataset(raw_dataset, mode=DATA_MODE)
 		print(f"{train_type} 数据预处理完成，样例: ", sft_source[:2])
 		return prepare_sft_dataset_from_messages(
 			dataset=sft_source,
@@ -266,7 +293,7 @@ def main():
 		output_dir = os.path.join(
 			OUTPUT_BASE_DIR,
 			dataset_tag,
-			f"{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config)}",
+			f"{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config,mode=DATA_MODE)}",
 		) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
 	elif train_type in {"SFT", "LORA"}:
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-3]
@@ -276,7 +303,7 @@ def main():
 			OUTPUT_BASE_DIR,
 			f"{dataset_tag}",
 			pt_datasets_type,
-			f"{mode_prefix}{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config)}",
+			f"{mode_prefix}{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config,mode=DATA_MODE,qa_files=TRAIN_QA_FILES or None)}",
 		) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
 	if IS_TEST:
 		output_dir += "_test"

@@ -5,10 +5,29 @@ import json
 import argparse
 from datetime import datetime
 from typing import List, Dict, Tuple
+from collections import defaultdict
 
 
 
 DEBUG = False
+
+# 问题关键词 → 属性名映射（与 generate_bios_datasets.py 中6类 QA 模板对齐）
+_QA_ATTR_PATTERNS = [
+    (r"What is the birth date of", "birth_date"),
+    (r"What is the birth city of", "birth_city"),
+    (r"Which university did", "university"),
+    (r"What major did", "field"),
+    (r"Which company did", "company1name"),
+    (r"Where did", "company1city"),
+]
+
+
+def _extract_attribute_from_question(question: str) -> str:
+    """从问句中提取属性名，未匹配时返回 'unknown'。"""
+    for pattern, attr_name in _QA_ATTR_PATTERNS:
+        if re.search(pattern, question):
+            return attr_name
+    return "unknown"
 
 
 def qa_text_to_messages(text: str) -> List[Dict[str, str]]:
@@ -118,11 +137,13 @@ def main():
         max_new_tokens: int,
         device: torch.device,
         verbose_errors: int = 0,
-    ) -> Tuple[float, List[Dict[str, object]]]:
+    ) -> Tuple[float, List[Dict[str, object]], Dict[str, Tuple[int, int]]]:
         total = 0
         correct = 0
         shown = 0
         per_sample_records: List[Dict[str, object]] = []
+        # per-attribute 统计: {attr_name: (correct, total)}
+        attr_stats: Dict[str, Tuple[int, int]] = defaultdict(lambda: [0, 0])
 
         for i in range(0, len(examples), batch_size):
             batch = examples[i:i + batch_size]
@@ -179,10 +200,16 @@ def main():
                 if ok:
                     correct += 1
 
+                # 提取属性并统计
+                attr = _extract_attribute_from_question(questions[j])
+                attr_stats[attr][0] += int(ok)
+                attr_stats[attr][1] += 1
+
                 per_sample_records.append(
                     {
                         "sample_id": total,
                         "is_correct": ok,
+                        "attribute": attr,
                         "question": questions[j],
                         "gold_answer": gold_answers[j],
                         "pred_answer": pred_text,
@@ -201,7 +228,9 @@ def main():
                     print(f"Pred(norm): {pred_norm}")
 
         acc = correct / total if total > 0 else 0.0
-        return acc, per_sample_records
+        # 转换 defaultdict 为普通 dict
+        attr_stats = dict(attr_stats)
+        return acc, per_sample_records, attr_stats
 
     parquet_glob = os.path.join(args.test_dir, "*.parquet")
     ds = load_dataset("parquet", data_files={"test": parquet_glob})["test"]
@@ -233,9 +262,9 @@ def main():
     if DEBUG:
         examples = examples[:2]
         args.batch_size = 1
-    
 
-    full_acc, records = evaluate_accuracy(
+
+    full_acc, records, attr_stats = evaluate_accuracy(
         model=model,
         tokenizer=tokenizer,
         examples=examples,
@@ -262,6 +291,13 @@ def main():
             f"test_dir={args.test_dir}",
             f"n={len(examples)}",
             f"accuracy={full_acc:.6f}",
+        ]
+        # 追加 per-attribute accuracy
+        for attr_name in sorted(attr_stats.keys()):
+            c, t = attr_stats[attr_name]
+            acc_attr = c / t if t > 0 else 0.0
+            metric_lines.append(f"accuracy_{attr_name}={acc_attr:.6f}")
+        metric_lines += [
             f"batch_size={args.batch_size}",
             f"max_input_length={args.max_input_length}",
             f"max_new_tokens={args.max_new_tokens}",
@@ -269,6 +305,9 @@ def main():
         save_metrics_txt(txt_path, metric_lines)
 
     print(f"[Eval] n={len(examples)}, accuracy={full_acc:.4f}")
+    for attr_name in sorted(attr_stats.keys()):
+        c, t = attr_stats[attr_name]
+        print(f"  {attr_name}: {c}/{t} = {c/t:.4f}")
     print(f"[Eval] per-sample outputs saved to: {jsonl_path}")
     print(f"[Eval] final metrics saved to: {txt_path}")
 
