@@ -21,6 +21,17 @@ _QA_ATTR_PATTERNS = [
     (r"Where did", "company1city"),
 ]
 
+# 属性名 → 问题关键词反查，用于从答案中剥离属性前缀
+_ATTR_PREFIXES = [
+    "birth date: ",
+    "birth city: ",
+    "university: ",
+    "field: ",
+    "major: ",
+    "company: ",
+    "company city: ",
+]
+
 
 def _extract_attribute_from_question(question: str) -> str:
     """从问句中提取属性名，未匹配时返回 'unknown'。"""
@@ -30,7 +41,31 @@ def _extract_attribute_from_question(question: str) -> str:
     return "unknown"
 
 
+def _strip_all_prefixes(s: str) -> str:
+    """剥离所有已知的答案前缀（Answer: / 属性名: / # / 前导空格），返回纯答案文本。"""
+    s = s.strip()
+    # 去掉 "Answer: " 或 "Answer:" 前缀
+    s = re.sub(r'^Answer:\s*', '', s, flags=re.IGNORECASE)
+    s = s.strip()
+    # 去掉属性名前缀（如 "birth date: "）
+    for prefix in _ATTR_PREFIXES:
+        if s.lower().startswith(prefix.lower()):
+            s = s[len(prefix):]
+            break
+    s = s.strip()
+    # 去掉开头单个 # 号（#January → January）
+    s = re.sub(r'^#\s*', '', s)
+    s = s.strip()
+    # 去掉末尾句号
+    s = s.rstrip(".")
+    s = s.strip()
+    # 合并多余空白
+    s = re.sub(r'\s+', ' ', s)
+    return s
+
+
 def qa_text_to_messages(text: str) -> List[Dict[str, str]]:
+    """兼容原始 text 格式，直接提取 question / assistant answer。"""
     text = str(text).strip()
     if "Answer:" in text:
         idx = text.index("Answer:")
@@ -46,6 +81,7 @@ def qa_text_to_messages(text: str) -> List[Dict[str, str]]:
 
 
 def extract_qa_from_example(example: Dict) -> Tuple[str, str]:
+    """从 sample 中提取 (question, gold_answer_content)。"""
     if "messages" in example and example["messages"] is not None:
         messages = example["messages"]
     elif "text" in example:
@@ -69,11 +105,8 @@ def extract_qa_from_example(example: Dict) -> Tuple[str, str]:
 
 
 def normalize_answer(s: str) -> str:
-    s = str(s).strip()
-    s = re.sub(r"^\s*Answer:\s*", "", s, flags=re.IGNORECASE)
-    s = s.strip().strip(".").strip()
-    s = re.sub(r"\s+", " ", s)
-    return s
+    """统一规范化答案文本：剥离所有已知前缀，仅保留核心答案值。"""
+    return _strip_all_prefixes(s)
 
 
 def save_jsonl(records: List[Dict], output_path: str) -> None:

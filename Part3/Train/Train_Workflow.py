@@ -19,7 +19,7 @@ from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoi
 
 IS_TEST = False
 TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
-DATA_MODE = "no_answer"  # 可选: "no_answer" / "#" / "attribute" / "raw"
+DATA_MODE = "raw"  # 可选: "no_answer" / "#" / "attribute" / "raw"
 
 # SFT/LORA 专用：指定要训练的 QA 属性文件列表，为空或 None 时使用 TRAIN_PARQUET_PATH 的 glob
 TRAIN_QA_FILES = [
@@ -49,8 +49,8 @@ if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
 
 	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_lr1e-03_wd1e-01_2026_04_13_22_00_10'
-	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_07'
-	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_59'
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_07'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_59'
 
 LORA_RANK_EMBED = 128
 LORA_RANK_QV = 16

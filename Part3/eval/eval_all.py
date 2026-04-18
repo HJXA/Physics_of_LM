@@ -11,13 +11,34 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.colors as mcolors
 
+
+import colorsys
+import hashlib
 
 CHECKPOINT_BASE = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/QA"
+# 线型和 marker 池（与颜色正交组合）
+_LINESTYLES = ["-", "--", "-.", ":"]
+_MARKERS = ["o", "s", "^", "d", "v", "p", "P", "D", "x", "*", "1", "2", "3", "4", "|", "h", ">", "<"]
+
+
+def _get_style_for(label):
+    """基于 label hash 动态分配 (color, linestyle, marker)，同一 label 永远同一样式。"""
+    h = hashlib.sha256(label.encode()).hexdigest()
+    # 颜色：hls 均匀分布，固定 lightness 和 saturation 保可读性
+    hue = int(h[:6], 16) / 0xFFFFFF
+    color = mcolors.to_hex(colorsys.hls_to_rgb(hue, 0.45, 0.75))
+    # 线型和 marker 用相隔较远的 hex 位，避免相似字符串分配相同样式
+    linestyle = _LINESTYLES[int(h[8], 16) % len(_LINESTYLES)]
+    marker = _MARKERS[int(h[20], 16) * len(_MARKERS) // 16]
+    return {"color": color, "linestyle": linestyle, "marker": marker}
+
+
 RESULT_BASE = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/result"
 EVAL_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval.py")
 PLOT_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/plots"
-GPU_IDS = [0, 1, 2, 3]  # 指定可用的 GPU ID 列表，而非数量
+GPU_IDS = [4,5,6,7]  # 指定可用的 GPU ID 列表，而非数量
 
 
 def get_checkpoints_to_eval():
@@ -129,27 +150,29 @@ def collect_results():
 
 def _map_legend_name(model_name):
     """将复杂的模型名称映射为图例中简洁的标签。"""
+    # 提取 mode 后缀（如 _mode_no_answer → _no_answer）
+    mode_suffix = ""
+    m = re.search(r"_mode_([^_]+)", model_name)
+    if m:
+        mode_suffix = f"_{m.group(1)}"
+
+    if 'mode' not in model_name and 'no_answer' in model_name:
+        mode_suffix = "_no_answer"
+
     if model_name.startswith("lora_llama2"):
         if "_rank_qv8_" in model_name:
-            return "lora_llama2_rank_qv8"
+            return "lora_llama2_rank_qv8" + mode_suffix
         elif "_rank_qv16_" in model_name:
-            label = "lora_llama2_rank_qv16"
-            if "no_answer" in model_name:
-                label += "_no_answer"
-            return label
+            return "lora_llama2_rank_qv16" + mode_suffix
         else:
-            return model_name
+            return "lora_llama2" + mode_suffix
 
     if model_name.startswith("sft_llama2"):
-        if "_no_answer_" in model_name:
-            return "sft_llama2_no_answer"
-        else:
-            return "sft_llama2_answer"
+        return "sft_llama2" + mode_suffix
 
     return model_name
 
 
-# 已知属性列表（固定顺序，与 generate_bios_datasets.py 对齐）
 KNOWN_ATTRS = ["birth_date", "birth_city", "university", "field", "company1name", "company1city"]
 
 
@@ -180,23 +203,39 @@ def plot_results(results, plot_dir):
                 steps = sorted(steps_dict.keys())
                 accs = [steps_dict[s].get("overall", 0) for s in steps]
                 label = _map_legend_name(model_name)
-                ax.plot(steps, accs, marker="o", label=label, linewidth=2, markersize=6)
+                s = _get_style_for(label)
+                ax.plot(steps, accs, label=label,
+                        color=s["color"], linestyle=s["linestyle"],
+                        marker=s["marker"], linewidth=2, markersize=6, alpha=0.85)
             ax.set_xlabel("Training Steps", fontsize=14)
             ax.set_ylabel("Accuracy", fontsize=14)
             ax.set_title(f"{model_type} — Accuracy vs Training Steps", fontsize=16)
             ax.legend(fontsize=9, bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
             ax.grid(True, alpha=0.3)
             ax.tick_params(axis="both", labelsize=12)
-            fig.tight_layout()
+            fig.subplots_adjust(right=0.75)
             plot_path = os.path.join(plot_dir, f"{model_type}_accuracy.png")
             fig.savefig(plot_path, dpi=150, bbox_inches="tight")
             plt.close(fig)
             print(f"[Plot] {plot_path}")
             continue
 
+        # 筛选有数据的属性
+        def _attr_has_data(attr_name):
+            for model_name, steps_dict in experiments.items():
+                if not steps_dict:
+                    continue
+                for step_data in steps_dict.values():
+                    if attr_name in step_data and isinstance(step_data[attr_name], (int, float)):
+                        return True
+            return False
+
+        has_data_attrs = [a for a in attr_order if _attr_has_data(a)]
+        n_data_attrs = len(has_data_attrs)
+
         # 布局：上方总图跨全宽，下方属性子图
-        n_cols = min(3, n_attrs)
-        n_rows_attrs = (n_attrs + n_cols - 1) // n_cols
+        n_cols = min(3, n_data_attrs) if n_data_attrs > 0 else 1
+        n_rows_attrs = (n_data_attrs + n_cols - 1) // n_cols if n_data_attrs > 0 else 0
         total_rows = 1 + n_rows_attrs
 
         fig = plt.figure(figsize=(6 * n_cols, 5 * total_rows))
@@ -210,15 +249,18 @@ def plot_results(results, plot_dir):
             steps = sorted(steps_dict.keys())
             accs = [steps_dict[s].get("overall", 0) for s in steps]
             label = _map_legend_name(model_name)
-            ax_overall.plot(steps, accs, marker="o", label=label, linewidth=2, markersize=6)
+            s = _get_style_for(label)
+            ax_overall.plot(steps, accs, label=label,
+                            color=s["color"], linestyle=s["linestyle"],
+                            marker=s["marker"], linewidth=2, markersize=6, alpha=0.85)
         ax_overall.set_xlabel("Training Steps", fontsize=12)
         ax_overall.set_ylabel("Accuracy", fontsize=12)
         ax_overall.set_title(f"{model_type} — Overall Accuracy", fontsize=14)
         ax_overall.legend(fontsize=8, bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
         ax_overall.grid(True, alpha=0.3)
 
-        # 属性子图
-        for idx, attr_name in enumerate(attr_order):
+        # 属性子图（均为有数据的属性）
+        for idx, attr_name in enumerate(has_data_attrs):
             row = 1 + idx // n_cols
             col = idx % n_cols
             ax_attr = fig.add_subplot(gs[row, col])
@@ -228,11 +270,13 @@ def plot_results(results, plot_dir):
                     continue
                 steps = sorted(steps_dict.keys())
                 accs = [steps_dict[s].get(attr_name, float("nan")) for s in steps]
-                # 跳过全为 nan 的曲线
                 if all(isinstance(a, float) and a != a for a in accs):
                     continue
                 label = _map_legend_name(model_name)
-                ax_attr.plot(steps, accs, marker="o", label=label, linewidth=1.5, markersize=4)
+                s = _get_style_for(label)
+                ax_attr.plot(steps, accs, label=label,
+                             color=s["color"], linestyle=s["linestyle"],
+                             marker=s["marker"], linewidth=1.5, markersize=4, alpha=0.85)
 
             ax_attr.set_xlabel("Steps", fontsize=10)
             ax_attr.set_ylabel("Accuracy", fontsize=10)
@@ -240,12 +284,11 @@ def plot_results(results, plot_dir):
             ax_attr.grid(True, alpha=0.3)
             ax_attr.tick_params(axis="both", labelsize=9)
 
-        # 只在最后一个子图放图例
-        if attr_order:
-            last_ax = fig.axes[-1]
-            last_ax.legend(fontsize=7, bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
+        # 图例放在最后一个属性子图上
+        if has_data_attrs:
+            fig.axes[-1].legend(fontsize=7, bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
 
-        fig.tight_layout()
+        fig.subplots_adjust(hspace=0.5, wspace=0.3, right=0.75)
         plot_path = os.path.join(plot_dir, f"{model_type}_accuracy.png")
         fig.savefig(plot_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
