@@ -1,0 +1,722 @@
+加载 Tokenizer: /ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2
+pad_token_id=0, bos_token_id=1, eos_token_id=2
+
+已加载 60000 条样本，来自 6 个文件
+
+==========================================================================================
+mode: no_answer
+==========================================================================================
+
+'?' 后第 0 个位置（覆盖 60000/60000 条）:
+  token_id=  3014, text='University'                   → 3771
+  token_id=  1570, text='New'                          → 1926
+  token_id=  3087, text='San'                          → 1046
+  token_id=  3111, text='August'                       → 950
+  token_id=  4779, text='March'                        → 897
+  token_id=  5490, text='January'                      → 892
+  token_id=  2610, text='May'                          → 890
+  token_id=  3786, text='April'                        → 868
+  token_id=  5468, text='July'                         → 858
+  token_id=  5533, text='October'                      → 835
+  token_id=  5306, text='June'                         → 832
+  token_id=  3979, text='November'                     → 825
+  token_id=  6339, text='February'                     → 800
+  token_id=  3839, text='September'                    → 776
+  token_id=  5846, text='December'                     → 775
+  token_id=   315, text='C'                            → 608
+  token_id= 24327, text='Houston'                      → 493
+  token_id= 26484, text='Atlanta'                      → 450
+  token_id= 10343, text='Information'                  → 424
+  token_id= 20972, text='Computer'                     → 406
+
+'?' 后第 1 个位置（覆盖 57674/60000 条）:
+  token_id= 29871, text=''                             → 10000
+  token_id=   310, text='of'                           → 3806
+  token_id= 29892, text=','                            → 3439
+  token_id=  3088, text='York'                         → 1442
+  token_id=  4306, text='State'                        → 884
+  token_id=  3014, text='University'                   → 590
+  token_id= 15057, text='Management'                   → 590
+  token_id=  1049, text='land'                         → 417
+  token_id=  3002, text='ology'                        → 397
+  token_id= 16972, text='Studies'                      → 376
+  token_id=  4909, text='ville'                        → 368
+  token_id=  5043, text='Jose'                         → 368
+  token_id=  2957, text='lied'                         → 363
+  token_id=  9327, text='Science'                      → 314
+  token_id=  4006, text='ford'                         → 302
+  token_id= 22557, text='Engineering'                  → 295
+  token_id=  1199, text='ics'                          → 294
+  token_id=   375, text='us'                           → 293
+  token_id=  8970, text='Francisco'                    → 270
+  token_id=  6346, text='College'                      → 233
+
+'?' 后第 2 个位置（覆盖 49768/60000 条）:
+  token_id= 29892, text=','                            → 8578
+  token_id= 29896, text='1'                            → 3893
+  token_id= 29906, text='2'                            → 3552
+  token_id=  3014, text='University'                   → 2187
+  token_id=   323, text='T'                            → 769
+  token_id=   265, text='on'                           → 603
+  token_id=   402, text='G'                            → 450
+  token_id= 29946, text='4'                            → 409
+  token_id= 22557, text='Engineering'                  → 396
+  token_id=   310, text='of'                           → 382
+  token_id= 29929, text='9'                            → 375
+  token_id= 29941, text='3'                            → 369
+  token_id= 29947, text='8'                            → 362
+  token_id= 29945, text='5'                            → 349
+  token_id= 29953, text='6'                            → 349
+  token_id=  8046, text='California'                   → 348
+  token_id=   383, text='F'                            → 345
+  token_id= 17674, text='IL'                           → 345
+  token_id= 10319, text='Texas'                        → 344
+  token_id= 29915, text="'"                            → 343
+
+'?' 后第 3 个位置（覆盖 40181/60000 条）:
+  token_id= 29892, text=','                            → 9974
+  token_id= 12766, text='CA'                           → 2014
+  token_id= 23526, text='NY'                           → 1519
+  token_id=  3014, text='University'                   → 1169
+  token_id= 29953, text='6'                            → 784
+  token_id= 29990, text='X'                            → 774
+  token_id= 29906, text='2'                            → 746
+  token_id= 29909, text='A'                            → 734
+  token_id= 29945, text='5'                            → 730
+  token_id= 29941, text='3'                            → 723
+  token_id= 29947, text='8'                            → 701
+  token_id= 29896, text='1'                            → 701
+  token_id= 29946, text='4'                            → 700
+  token_id= 29900, text='0'                            → 696
+  token_id= 29955, text='7'                            → 660
+  token_id=   323, text='T'                            → 627
+  token_id= 29879, text='s'                            → 548
+  token_id= 29929, text='9'                            → 376
+  token_id=   405, text='N'                            → 363
+  token_id=   438, text='O'                            → 328
+
+'?' 后第 4 个位置（覆盖 27314/60000 条）:
+  token_id= 29892, text=','                            → 8515
+  token_id= 29871, text=''                             → 3255
+  token_id= 12766, text='CA'                           → 1347
+  token_id=   323, text='T'                            → 1097
+  token_id= 29990, text='X'                            → 574
+  token_id= 29909, text='A'                            → 559
+  token_id=  3014, text='University'                   → 508
+  token_id=   478, text='V'                            → 379
+  token_id=   341, text='M'                            → 334
+  token_id= 17674, text='IL'                           → 314
+  token_id= 29950, text='H'                            → 294
+  token_id= 29931, text='L'                            → 265
+  token_id= 29967, text='J'                            → 254
+  token_id=   383, text='F'                            → 253
+  token_id= 29979, text='Y'                            → 248
+  token_id=   405, text='N'                            → 246
+  token_id=   319, text='A'                            → 238
+  token_id= 23526, text='NY'                           → 227
+  token_id= 29879, text='s'                            → 199
+  token_id=   501, text='U'                            → 190
+
+示例（前 3 条）:
+
+  --- 示例 0 ---
+  原始: What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.
+  拼接: 'What is the birth date of Alexandria Evan Martin? April 8, 1935'
+  ?后  : ['April', '', '8', ',', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13878, 2849, 382, 3703, 6502, 29973, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+  Full labels: [3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+
+  --- 示例 1 ---
+  原始: What is the birth date of Angela Harper King? Answer: February 7, 1959.
+  拼接: 'What is the birth date of Angela Harper King? February 7, 1959'
+  ?后  : ['February', '', '7', ',', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 3218, 3100, 3536, 546, 4088, 29973, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+  Full labels: [6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+
+  --- 示例 2 ---
+  原始: What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.
+  拼接: 'What is the birth date of Cassandra Paige Chappell? April 15, 2050'
+  ?后  : ['April', '', '1', '5', ',']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13088, 10738, 2621, 2231, 678, 932, 514, 29973, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+  Full labels: [3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+
+==========================================================================================
+mode: #
+==========================================================================================
+
+'?' 后第 0 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+'?' 后第 1 个位置（覆盖 60000/60000 条）:
+  token_id= 11574, text='Univers'                      → 3771
+  token_id= 29967, text='J'                            → 2923
+  token_id= 29933, text='B'                            → 2386
+  token_id= 29924, text='M'                            → 2138
+  token_id= 29943, text='F'                            → 1974
+  token_id=  4373, text='New'                          → 1926
+  token_id= 29950, text='H'                            → 1880
+  token_id= 29909, text='A'                            → 1746
+  token_id= 29903, text='S'                            → 1398
+  token_id= 29907, text='C'                            → 1381
+  token_id= 29925, text='P'                            → 1143
+  token_id= 29931, text='L'                            → 1059
+  token_id= 22509, text='San'                          → 1046
+  token_id= 29956, text='W'                            → 1044
+  token_id= 29940, text='N'                            → 1038
+  token_id=  2008, text='Se'                           → 1012
+  token_id= 26197, text='August'                       → 950
+  token_id=  1451, text='Ch'                           → 904
+  token_id= 12703, text='May'                          → 890
+  token_id= 25375, text='Oct'                          → 835
+
+'?' 后第 2 个位置（覆盖 59359/60000 条）:
+  token_id=   537, text='ity'                          → 3771
+  token_id= 29871, text=''                             → 1642
+  token_id=  1096, text='ember'                        → 1600
+  token_id=  3088, text='York'                         → 1442
+  token_id=  1279, text='arch'                         → 897
+  token_id= 15623, text='anu'                          → 892
+  token_id=  3193, text='pril'                         → 868
+  token_id= 11850, text='uly'                          → 858
+  token_id=  4950, text='ober'                         → 835
+  token_id=  1540, text='une'                          → 832
+  token_id=  3205, text='ebru'                         → 800
+  token_id=  3266, text='ptember'                      → 776
+  token_id= 29880, text='l'                            → 678
+  token_id=   261, text='er'                           → 596
+  token_id=   283, text='ou'                           → 561
+  token_id=   272, text='or'                           → 504
+  token_id=   294, text='as'                           → 489
+  token_id=  3335, text='iness'                        → 399
+  token_id=  6949, text='anta'                         → 390
+  token_id=   309, text='il'                           → 379
+
+'?' 后第 3 个位置（覆盖 54368/60000 条）:
+  token_id= 29871, text=''                             → 6666
+  token_id= 29892, text=','                            → 6596
+  token_id=   310, text='of'                           → 3827
+  token_id=   653, text='ary'                          → 1692
+  token_id=  3014, text='University'                   → 897
+  token_id=  4306, text='State'                        → 800
+  token_id= 29896, text='1'                            → 615
+  token_id=   265, text='on'                           → 608
+  token_id= 29906, text='2'                            → 580
+  token_id=  7352, text='ston'                         → 493
+  token_id=  6949, text='anta'                         → 450
+  token_id= 15057, text='Management'                   → 414
+  token_id=  4412, text='City'                         → 374
+  token_id=   423, text='ia'                           → 355
+  token_id=   375, text='us'                           → 336
+  token_id=  6346, text='College'                      → 306
+  token_id=  1199, text='ics'                          → 304
+  token_id=   936, text='ical'                         → 303
+  token_id= 22557, text='Engineering'                  → 295
+  token_id=   880, text='ton'                          → 292
+
+'?' 后第 4 个位置（覆盖 47014/60000 条）:
+  token_id= 29892, text=','                            → 9241
+  token_id= 29896, text='1'                            → 2731
+  token_id= 29906, text='2'                            → 2487
+  token_id=  3014, text='University'                   → 1979
+  token_id= 29871, text=''                             → 1764
+  token_id= 23526, text='NY'                           → 1411
+  token_id= 12766, text='CA'                           → 1179
+  token_id=  3002, text='ology'                        → 516
+  token_id=   323, text='T'                            → 481
+  token_id= 22557, text='Engineering'                  → 473
+  token_id= 29879, text='s'                            → 436
+  token_id= 17674, text='IL'                           → 409
+  token_id= 29946, text='4'                            → 389
+  token_id=  4306, text='State'                        → 375
+  token_id= 29941, text='3'                            → 371
+  token_id= 14861, text='MA'                           → 363
+  token_id=   399, text='W'                            → 353
+  token_id=  8046, text='California'                   → 348
+  token_id= 29947, text='8'                            → 347
+  token_id=   383, text='F'                            → 347
+
+示例（前 3 条）:
+
+  --- 示例 0 ---
+  原始: What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.
+  拼接: 'What is the birth date of Alexandria Evan Martin? #April 8, 1935'
+  ?后  : ['#', 'A', 'pril', '', '8']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13878, 2849, 382, 3703, 6502, 29973, 396, 29909, 3193, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+  Full labels: [396, 29909, 3193, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+
+  --- 示例 1 ---
+  原始: What is the birth date of Angela Harper King? Answer: February 7, 1959.
+  拼接: 'What is the birth date of Angela Harper King? #February 7, 1959'
+  ?后  : ['#', 'F', 'ebru', 'ary', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 3218, 3100, 3536, 546, 4088, 29973, 396, 29943, 3205, 653, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+  Full labels: [396, 29943, 3205, 653, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+
+  --- 示例 2 ---
+  原始: What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.
+  拼接: 'What is the birth date of Cassandra Paige Chappell? #April 15, 2050'
+  ?后  : ['#', 'A', 'pril', '', '1']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13088, 10738, 2621, 2231, 678, 932, 514, 29973, 396, 29909, 3193, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+  Full labels: [396, 29909, 3193, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+
+==========================================================================================
+mode: # #
+==========================================================================================
+
+'?' 后第 0 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+'?' 后第 1 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+'?' 后第 2 个位置（覆盖 60000/60000 条）:
+  token_id= 11574, text='Univers'                      → 3771
+  token_id= 29967, text='J'                            → 2923
+  token_id= 29933, text='B'                            → 2386
+  token_id= 29924, text='M'                            → 2138
+  token_id= 29943, text='F'                            → 1974
+  token_id=  4373, text='New'                          → 1926
+  token_id= 29950, text='H'                            → 1880
+  token_id= 29909, text='A'                            → 1746
+  token_id= 29903, text='S'                            → 1398
+  token_id= 29907, text='C'                            → 1381
+  token_id= 29925, text='P'                            → 1143
+  token_id= 29931, text='L'                            → 1059
+  token_id= 22509, text='San'                          → 1046
+  token_id= 29956, text='W'                            → 1044
+  token_id= 29940, text='N'                            → 1038
+  token_id=  2008, text='Se'                           → 1012
+  token_id= 26197, text='August'                       → 950
+  token_id=  1451, text='Ch'                           → 904
+  token_id= 12703, text='May'                          → 890
+  token_id= 25375, text='Oct'                          → 835
+
+'?' 后第 3 个位置（覆盖 59359/60000 条）:
+  token_id=   537, text='ity'                          → 3771
+  token_id= 29871, text=''                             → 1642
+  token_id=  1096, text='ember'                        → 1600
+  token_id=  3088, text='York'                         → 1442
+  token_id=  1279, text='arch'                         → 897
+  token_id= 15623, text='anu'                          → 892
+  token_id=  3193, text='pril'                         → 868
+  token_id= 11850, text='uly'                          → 858
+  token_id=  4950, text='ober'                         → 835
+  token_id=  1540, text='une'                          → 832
+  token_id=  3205, text='ebru'                         → 800
+  token_id=  3266, text='ptember'                      → 776
+  token_id= 29880, text='l'                            → 678
+  token_id=   261, text='er'                           → 596
+  token_id=   283, text='ou'                           → 561
+  token_id=   272, text='or'                           → 504
+  token_id=   294, text='as'                           → 489
+  token_id=  3335, text='iness'                        → 399
+  token_id=  6949, text='anta'                         → 390
+  token_id=   309, text='il'                           → 379
+
+'?' 后第 4 个位置（覆盖 54368/60000 条）:
+  token_id= 29871, text=''                             → 6666
+  token_id= 29892, text=','                            → 6596
+  token_id=   310, text='of'                           → 3827
+  token_id=   653, text='ary'                          → 1692
+  token_id=  3014, text='University'                   → 897
+  token_id=  4306, text='State'                        → 800
+  token_id= 29896, text='1'                            → 615
+  token_id=   265, text='on'                           → 608
+  token_id= 29906, text='2'                            → 580
+  token_id=  7352, text='ston'                         → 493
+  token_id=  6949, text='anta'                         → 450
+  token_id= 15057, text='Management'                   → 414
+  token_id=  4412, text='City'                         → 374
+  token_id=   423, text='ia'                           → 355
+  token_id=   375, text='us'                           → 336
+  token_id=  6346, text='College'                      → 306
+  token_id=  1199, text='ics'                          → 304
+  token_id=   936, text='ical'                         → 303
+  token_id= 22557, text='Engineering'                  → 295
+  token_id=   880, text='ton'                          → 292
+
+示例（前 3 条）:
+
+  --- 示例 0 ---
+  原始: What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.
+  拼接: 'What is the birth date of Alexandria Evan Martin? # #April 8, 1935'
+  ?后  : ['#', '#', 'A', 'pril', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13878, 2849, 382, 3703, 6502, 29973, 396, 396, 29909, 3193, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+  Full labels: [396, 396, 29909, 3193, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+
+  --- 示例 1 ---
+  原始: What is the birth date of Angela Harper King? Answer: February 7, 1959.
+  拼接: 'What is the birth date of Angela Harper King? # #February 7, 1959'
+  ?后  : ['#', '#', 'F', 'ebru', 'ary']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 3218, 3100, 3536, 546, 4088, 29973, 396, 396, 29943, 3205, 653, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+  Full labels: [396, 396, 29943, 3205, 653, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+
+  --- 示例 2 ---
+  原始: What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.
+  拼接: 'What is the birth date of Cassandra Paige Chappell? # #April 15, 2050'
+  ?后  : ['#', '#', 'A', 'pril', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13088, 10738, 2621, 2231, 678, 932, 514, 29973, 396, 396, 29909, 3193, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+  Full labels: [396, 396, 29909, 3193, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+
+==========================================================================================
+mode: #*10
+==========================================================================================
+
+'?' 后第 0 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+'?' 后第 1 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+'?' 后第 2 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+'?' 后第 3 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+'?' 后第 4 个位置（覆盖 60000/60000 条）:
+  token_id=   396, text='#'                            → 60000
+
+示例（前 3 条）:
+
+  --- 示例 0 ---
+  原始: What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.
+  拼接: 'What is the birth date of Alexandria Evan Martin? # # # # # # # # # # April 8, 1935'
+  ?后  : ['#', '#', '#', '#', '#']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13878, 2849, 382, 3703, 6502, 29973, 396, 396, 396, 396, 396, 396, 396, 396, 396, 396, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+  Full labels: [396, 396, 396, 396, 396, 396, 396, 396, 396, 396, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+
+  --- 示例 1 ---
+  原始: What is the birth date of Angela Harper King? Answer: February 7, 1959.
+  拼接: 'What is the birth date of Angela Harper King? # # # # # # # # # # February 7, 1959'
+  ?后  : ['#', '#', '#', '#', '#']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 3218, 3100, 3536, 546, 4088, 29973, 396, 396, 396, 396, 396, 396, 396, 396, 396, 396, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+  Full labels: [396, 396, 396, 396, 396, 396, 396, 396, 396, 396, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+
+  --- 示例 2 ---
+  原始: What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.
+  拼接: 'What is the birth date of Cassandra Paige Chappell? # # # # # # # # # # April 15, 2050'
+  ?后  : ['#', '#', '#', '#', '#']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13088, 10738, 2621, 2231, 678, 932, 514, 29973, 396, 396, 396, 396, 396, 396, 396, 396, 396, 396, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+  Full labels: [396, 396, 396, 396, 396, 396, 396, 396, 396, 396, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+
+==========================================================================================
+mode: space
+==========================================================================================
+
+'?' 后第 0 个位置（覆盖 60000/60000 条）:
+  token_id= 29871, text=''                             → 59960
+  token_id=   259, text=' '                            → 40
+
+'?' 后第 1 个位置（覆盖 60000/60000 条）:
+  token_id=  3014, text='University'                   → 3771
+  token_id=  1570, text='New'                          → 1926
+  token_id=  3087, text='San'                          → 1046
+  token_id=  3111, text='August'                       → 950
+  token_id=  4779, text='March'                        → 897
+  token_id=  5490, text='January'                      → 892
+  token_id=  2610, text='May'                          → 890
+  token_id=  3786, text='April'                        → 868
+  token_id=  5468, text='July'                         → 858
+  token_id=  5533, text='October'                      → 835
+  token_id=  5306, text='June'                         → 832
+  token_id=  3979, text='November'                     → 825
+  token_id=  6339, text='February'                     → 800
+  token_id=  3839, text='September'                    → 776
+  token_id=  5846, text='December'                     → 775
+  token_id=   315, text='C'                            → 608
+  token_id= 24327, text='Houston'                      → 493
+  token_id= 26484, text='Atlanta'                      → 450
+  token_id= 10343, text='Information'                  → 424
+  token_id= 20972, text='Computer'                     → 406
+
+'?' 后第 2 个位置（覆盖 57674/60000 条）:
+  token_id= 29871, text=''                             → 10000
+  token_id=   310, text='of'                           → 3806
+  token_id= 29892, text=','                            → 3439
+  token_id=  3088, text='York'                         → 1442
+  token_id=  4306, text='State'                        → 884
+  token_id=  3014, text='University'                   → 590
+  token_id= 15057, text='Management'                   → 590
+  token_id=  1049, text='land'                         → 417
+  token_id=  3002, text='ology'                        → 397
+  token_id= 16972, text='Studies'                      → 376
+  token_id=  4909, text='ville'                        → 368
+  token_id=  5043, text='Jose'                         → 368
+  token_id=  2957, text='lied'                         → 363
+  token_id=  9327, text='Science'                      → 314
+  token_id=  4006, text='ford'                         → 302
+  token_id= 22557, text='Engineering'                  → 295
+  token_id=  1199, text='ics'                          → 294
+  token_id=   375, text='us'                           → 293
+  token_id=  8970, text='Francisco'                    → 270
+  token_id=  6346, text='College'                      → 233
+
+'?' 后第 3 个位置（覆盖 49728/60000 条）:
+  token_id= 29892, text=','                            → 8578
+  token_id= 29896, text='1'                            → 3893
+  token_id= 29906, text='2'                            → 3552
+  token_id=  3014, text='University'                   → 2187
+  token_id=   323, text='T'                            → 769
+  token_id=   265, text='on'                           → 603
+  token_id=   402, text='G'                            → 450
+  token_id= 29946, text='4'                            → 409
+  token_id= 22557, text='Engineering'                  → 396
+  token_id=   310, text='of'                           → 382
+  token_id= 29929, text='9'                            → 375
+  token_id= 29941, text='3'                            → 369
+  token_id= 29947, text='8'                            → 362
+  token_id= 29945, text='5'                            → 349
+  token_id= 29953, text='6'                            → 349
+  token_id=  8046, text='California'                   → 348
+  token_id=   383, text='F'                            → 345
+  token_id= 17674, text='IL'                           → 345
+  token_id= 10319, text='Texas'                        → 344
+  token_id= 29915, text="'"                            → 343
+
+'?' 后第 4 个位置（覆盖 40181/60000 条）:
+  token_id= 29892, text=','                            → 9974
+  token_id= 12766, text='CA'                           → 2014
+  token_id= 23526, text='NY'                           → 1519
+  token_id=  3014, text='University'                   → 1169
+  token_id= 29953, text='6'                            → 784
+  token_id= 29990, text='X'                            → 774
+  token_id= 29906, text='2'                            → 746
+  token_id= 29909, text='A'                            → 734
+  token_id= 29945, text='5'                            → 730
+  token_id= 29941, text='3'                            → 723
+  token_id= 29947, text='8'                            → 701
+  token_id= 29896, text='1'                            → 701
+  token_id= 29946, text='4'                            → 700
+  token_id= 29900, text='0'                            → 696
+  token_id= 29955, text='7'                            → 660
+  token_id=   323, text='T'                            → 627
+  token_id= 29879, text='s'                            → 548
+  token_id= 29929, text='9'                            → 376
+  token_id=   405, text='N'                            → 363
+  token_id=   438, text='O'                            → 328
+
+示例（前 3 条）:
+
+  --- 示例 0 ---
+  原始: What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.
+  拼接: 'What is the birth date of Alexandria Evan Martin?  April 8, 1935'
+  ?后  : ['', 'April', '', '8', ',']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13878, 2849, 382, 3703, 6502, 29973, 29871, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+  Full labels: [29871, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+
+  --- 示例 1 ---
+  原始: What is the birth date of Angela Harper King? Answer: February 7, 1959.
+  拼接: 'What is the birth date of Angela Harper King?  February 7, 1959'
+  ?后  : ['', 'February', '', '7', ',']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 3218, 3100, 3536, 546, 4088, 29973, 29871, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+  Full labels: [29871, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+
+  --- 示例 2 ---
+  原始: What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.
+  拼接: 'What is the birth date of Cassandra Paige Chappell?  April 15, 2050'
+  ?后  : ['', 'April', '', '1', '5']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13088, 10738, 2621, 2231, 678, 932, 514, 29973, 29871, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+  Full labels: [29871, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+
+==========================================================================================
+mode: attribute
+==========================================================================================
+
+'?' 后第 0 个位置（覆盖 60000/60000 条）:
+  token_id= 12060, text='birth'                        → 20000
+  token_id=  5001, text='company'                      → 20000
+  token_id= 16372, text='university'                   → 10000
+  token_id=  4655, text='major'                        → 10000
+
+'?' 后第 1 个位置（覆盖 60000/60000 条）:
+  token_id= 29901, text=':'                            → 30000
+  token_id=  4272, text='city'                         → 20000
+  token_id=  2635, text='date'                         → 10000
+
+'?' 后第 2 个位置（覆盖 60000/60000 条）:
+  token_id= 29901, text=':'                            → 30000
+  token_id=  3014, text='University'                   → 3771
+  token_id= 10343, text='Information'                  → 424
+  token_id= 20972, text='Computer'                     → 406
+  token_id= 15197, text='Business'                     → 399
+  token_id=   315, text='C'                            → 384
+  token_id=  2401, text='App'                          → 363
+  token_id=  3457, text='Bi'                           → 347
+  token_id=  5236, text='Public'                       → 342
+  token_id= 12968, text='Human'                        → 307
+  token_id=   476, text='K'                            → 293
+  token_id=   405, text='N'                            → 292
+  token_id=  4623, text='International'                → 291
+  token_id= 22365, text='Communic'                     → 291
+  token_id=   379, text='H'                            → 268
+  token_id=   319, text='A'                            → 227
+  token_id=  3630, text='Data'                         → 224
+  token_id=   360, text='D'                            → 219
+  token_id=  4593, text='General'                      → 211
+  token_id= 12157, text='Indust'                       → 209
+
+'?' 后第 3 个位置（覆盖 57674/60000 条）:
+  token_id=   310, text='of'                           → 3806
+  token_id=  1570, text='New'                          → 1785
+  token_id=  3111, text='August'                       → 912
+  token_id=  3087, text='San'                          → 906
+  token_id=  4779, text='March'                        → 897
+  token_id=  5490, text='January'                      → 892
+  token_id=  4306, text='State'                        → 884
+  token_id=  3786, text='April'                        → 868
+  token_id=  5468, text='July'                         → 858
+  token_id=  5533, text='October'                      → 835
+  token_id=  5306, text='June'                         → 832
+  token_id=  3979, text='November'                     → 825
+  token_id=  2610, text='May'                          → 808
+  token_id=  6339, text='February'                     → 800
+  token_id=  3839, text='September'                    → 776
+  token_id=  5846, text='December'                     → 775
+  token_id=  3014, text='University'                   → 590
+  token_id= 15057, text='Management'                   → 590
+  token_id= 24327, text='Houston'                      → 493
+  token_id= 26484, text='Atlanta'                      → 450
+
+'?' 后第 4 个位置（覆盖 49768/60000 条）:
+  token_id= 29871, text=''                             → 10072
+  token_id= 29892, text=','                            → 3476
+  token_id=  3014, text='University'                   → 2187
+  token_id=  3088, text='York'                         → 1408
+  token_id=   265, text='on'                           → 440
+  token_id= 22557, text='Engineering'                  → 396
+  token_id=   310, text='of'                           → 382
+  token_id=  4909, text='ville'                        → 368
+  token_id=  1049, text='land'                         → 364
+  token_id=  8046, text='California'                   → 348
+  token_id= 10319, text='Texas'                        → 344
+  token_id= 29915, text="'"                            → 343
+  token_id=  5043, text='Jose'                         → 328
+  token_id=   375, text='us'                           → 310
+  token_id=  4306, text='State'                        → 294
+  token_id=   800, text='ations'                       → 287
+  token_id=  6346, text='College'                      → 259
+  token_id=   292, text='ing'                          → 246
+  token_id=  8970, text='Francisco'                    → 237
+  token_id= 15057, text='Management'                   → 235
+
+示例（前 3 条）:
+
+  --- 示例 0 ---
+  原始: What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.
+  拼接: 'What is the birth date of Alexandria Evan Martin? birth date: April 8, 1935'
+  ?后  : ['birth', 'date', ':', 'April', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13878, 2849, 382, 3703, 6502, 29973, 12060, 2635, 29901, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+  Full labels: [12060, 2635, 29901, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945]
+
+  --- 示例 1 ---
+  原始: What is the birth date of Angela Harper King? Answer: February 7, 1959.
+  拼接: 'What is the birth date of Angela Harper King? birth date: February 7, 1959'
+  ?后  : ['birth', 'date', ':', 'February', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 3218, 3100, 3536, 546, 4088, 29973, 12060, 2635, 29901, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+  Full labels: [12060, 2635, 29901, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929]
+
+  --- 示例 2 ---
+  原始: What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.
+  拼接: 'What is the birth date of Cassandra Paige Chappell? birth date: April 15, 2050'
+  ?后  : ['birth', 'date', ':', 'April', '']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13088, 10738, 2621, 2231, 678, 932, 514, 29973, 12060, 2635, 29901, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+  Full labels: [12060, 2635, 29901, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900]
+
+==========================================================================================
+mode: raw
+==========================================================================================
+
+'?' 后第 0 个位置（覆盖 60000/60000 条）:
+  token_id=   673, text='Answer'                       → 60000
+
+'?' 后第 1 个位置（覆盖 60000/60000 条）:
+  token_id= 29901, text=':'                            → 60000
+
+'?' 后第 2 个位置（覆盖 60000/60000 条）:
+  token_id=  3014, text='University'                   → 3771
+  token_id=  1570, text='New'                          → 1926
+  token_id=  3087, text='San'                          → 1046
+  token_id=  3111, text='August'                       → 950
+  token_id=  4779, text='March'                        → 897
+  token_id=  5490, text='January'                      → 892
+  token_id=  2610, text='May'                          → 890
+  token_id=  3786, text='April'                        → 868
+  token_id=  5468, text='July'                         → 858
+  token_id=  5533, text='October'                      → 835
+  token_id=  5306, text='June'                         → 832
+  token_id=  3979, text='November'                     → 825
+  token_id=  6339, text='February'                     → 800
+  token_id=  3839, text='September'                    → 776
+  token_id=  5846, text='December'                     → 775
+  token_id=   315, text='C'                            → 608
+  token_id= 24327, text='Houston'                      → 493
+  token_id= 26484, text='Atlanta'                      → 450
+  token_id= 10343, text='Information'                  → 424
+  token_id= 20972, text='Computer'                     → 406
+
+'?' 后第 3 个位置（覆盖 60000/60000 条）:
+  token_id= 29871, text=''                             → 10000
+  token_id=   310, text='of'                           → 3806
+  token_id= 29892, text=','                            → 3439
+  token_id= 29889, text='.'                            → 2519
+  token_id=  3088, text='York'                         → 1442
+  token_id=  4306, text='State'                        → 884
+  token_id=  3014, text='University'                   → 590
+  token_id= 15057, text='Management'                   → 590
+  token_id=  1049, text='land'                         → 417
+  token_id=  3002, text='ology'                        → 397
+  token_id= 16972, text='Studies'                      → 376
+  token_id=  4909, text='ville'                        → 368
+  token_id=  5043, text='Jose'                         → 368
+  token_id=  2957, text='lied'                         → 363
+  token_id=  9327, text='Science'                      → 314
+  token_id=  4006, text='ford'                         → 302
+  token_id= 22557, text='Engineering'                  → 295
+  token_id=  1199, text='ics'                          → 294
+  token_id=   375, text='us'                           → 293
+  token_id=  8970, text='Francisco'                    → 270
+
+'?' 后第 4 个位置（覆盖 57674/60000 条）:
+  token_id= 29892, text=','                            → 8578
+  token_id= 29889, text='.'                            → 7993
+  token_id= 29896, text='1'                            → 3893
+  token_id= 29906, text='2'                            → 3552
+  token_id=  3014, text='University'                   → 2187
+  token_id=   323, text='T'                            → 769
+  token_id=   265, text='on'                           → 603
+  token_id=   402, text='G'                            → 450
+  token_id= 29946, text='4'                            → 409
+  token_id= 22557, text='Engineering'                  → 396
+  token_id=   310, text='of'                           → 382
+  token_id= 29929, text='9'                            → 375
+  token_id= 29941, text='3'                            → 369
+  token_id= 29947, text='8'                            → 362
+  token_id= 29945, text='5'                            → 349
+  token_id= 29953, text='6'                            → 349
+  token_id=  8046, text='California'                   → 348
+  token_id=   383, text='F'                            → 345
+  token_id= 17674, text='IL'                           → 345
+  token_id= 10319, text='Texas'                        → 344
+
+示例（前 3 条）:
+
+  --- 示例 0 ---
+  原始: What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.
+  拼接: 'What is the birth date of Alexandria Evan Martin? Answer: April 8, 1935.'
+  ?后  : ['Answer', ':', 'April', '', '8']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13878, 2849, 382, 3703, 6502, 29973, 673, 29901, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945, 29889]
+  Full labels: [673, 29901, 3786, 29871, 29947, 29892, 29871, 29896, 29929, 29941, 29945, 29889]
+
+  --- 示例 1 ---
+  原始: What is the birth date of Angela Harper King? Answer: February 7, 1959.
+  拼接: 'What is the birth date of Angela Harper King? Answer: February 7, 1959.'
+  ?后  : ['Answer', ':', 'February', '', '7']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 3218, 3100, 3536, 546, 4088, 29973, 673, 29901, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929, 29889]
+  Full labels: [673, 29901, 6339, 29871, 29955, 29892, 29871, 29896, 29929, 29945, 29929, 29889]
+
+  --- 示例 2 ---
+  原始: What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.
+  拼接: 'What is the birth date of Cassandra Paige Chappell? Answer: April 15, 2050.'
+  ?后  : ['Answer', ':', 'April', '', '1']
+  Full input_ids: [1724, 338, 278, 12060, 2635, 310, 13088, 10738, 2621, 2231, 678, 932, 514, 29973, 673, 29901, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900, 29889]
+  Full labels: [673, 29901, 3786, 29871, 29896, 29945, 29892, 29871, 29906, 29900, 29945, 29900, 29889]

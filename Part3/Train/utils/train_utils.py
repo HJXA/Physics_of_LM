@@ -21,13 +21,15 @@ def _extract_attr_name(question: str) -> str:
     return "unknown"
 
 
-def part3_qa_text_to_messages(text: str, mode: str = "no_answer"):
+def part3_qa_text_to_messages(text: str, mode: str = "no-answer"):
     """
-    将 QA 文本转为 messages，支持4种 mode：
-    - "no_answer": assistant content = "January 26, 1980"（纯答案，无前缀）
-    - "#":     assistant content = "#January 26, 1980"（前导井号+纯答案）
-    - "attribute": assistant content = "birth date: January 26, 1980"（属性名替代Answer:）
-    - "raw":       assistant content = "Answer: January 26, 1980."（保留原文不去除Answer:和句号）
+    将 QA 文本转为 messages，支持以下 mode：
+    - "no-answer":   assistant content = "January 26, 1980"（纯答案，无前缀）
+    - "#":          assistant content = "#January 26, 1980"（前导井号+纯答案）
+    - "# #":        assistant content = "# #January 26, 1980"（双井号+纯答案）
+    - "#*10":       assistant content = "# # # # # # # # # #January 26, 1980"（10个#号+纯答案）
+    - "attribute":  assistant content = "birth date: January 26, 1980"（属性名替代Answer:）
+    - "raw":        assistant content = "Answer: January 26, 1980."（保留原文不去除Answer:和句号）
     """
     text = str(text).strip()
 
@@ -37,17 +39,21 @@ def part3_qa_text_to_messages(text: str, mode: str = "no_answer"):
         answer_raw = text[idx + len("Answer:"):].strip()
         answer_value = answer_raw.rstrip(".")
 
-        if mode == "no_answer":
+        if mode == "no-answer":
             assistant_content = answer_value
         elif mode == "#":
             assistant_content = f"#{answer_value}"
+        elif mode == "# #":
+            assistant_content = f"# #{answer_value}"
+        elif mode == "#*10":
+            assistant_content = f"{'# ' * 10}{answer_value}"
         elif mode == "attribute":
             attr_name = _extract_attr_name(question)
             assistant_content = f"{attr_name}: {answer_value}"
         elif mode == "raw":
             assistant_content = text[idx:].strip()
         else:
-            raise ValueError(f"Unsupported mode: {mode}, expected 'no_answer'/'#'/'attribute'/'raw'")
+            raise ValueError(f"Unsupported mode: {mode}, expected 'no_answer'/'#'/'# #'/'#*10'/'attribute'/'raw'")
     else:
         question = text
         assistant_content = ""
@@ -58,7 +64,7 @@ def part3_qa_text_to_messages(text: str, mode: str = "no_answer"):
     ]
 
 
-def part3_prepare_sft_source_dataset(raw_dataset: Dataset, mode: str = "no_answer") -> Dataset:
+def part3_prepare_sft_source_dataset(raw_dataset: Dataset, mode: str = "no-answer") -> Dataset:
     """SFT 数据预处理：支持 messages 原生格式，或由 QA text 动态构造成 messages。"""
     if "messages" in raw_dataset.column_names:
         return raw_dataset

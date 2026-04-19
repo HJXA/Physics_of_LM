@@ -19,7 +19,7 @@ from datasets import Dataset
 
 # 以下用于测试
 from transformers import AutoTokenizer
-from train_utils import preview_collator_batch
+from utils.train_utils import preview_collator_batch
 
 def build_tokenizer(model, model_path: str):
     """加载 tokenizer，保证pad_token_id不为None，至少为eos_token_id。"""
@@ -431,12 +431,19 @@ class SFTMessagesTokenizerBuilder:
                         # chat_template 不可用时，自动回退到手工模板。
                         raise "指定了 apply_chat_template=True，但 tokenizer 无法正确应用 chat template，可能缺乏相关实现或参数支持，请检查 tokenizer 兼容性。"
                 else:
-                    raise ValueError("apply_chat_template=True 但是 tokenizer 没有 chat_template")
+                    # 简单的多轮回退：按角色标记拼接
+                    parts = []
+                    for msg in messages:
+                        role = msg.get("role", "unknown")
+                        content = msg.get("content", "")
+                        parts.append(f"{role}: {content}")
+                    print(f"[Warn] tokenizer 没有 chat_template，使用内置回退模版: role: content 拼接")
+                    return "\n".join(parts)
 
         else: # 不用模版
             """
             不使用任何模板，直接拼接为：
-            QuestionAnswer
+            Question Answer
             """
             lines: List[str] = []
             # 逐条消息构建回退文本。
@@ -446,7 +453,7 @@ class SFTMessagesTokenizerBuilder:
                 # 生成一条简单的“角色+内容”片段。
                 lines.append(f"{content}")
             # 将所有片段直接连接成完整文本。
-            return "".join(lines)
+            return " ".join(lines)
 
 
     def _tokenize_with_assistant_mask(

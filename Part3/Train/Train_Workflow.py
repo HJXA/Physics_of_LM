@@ -3,7 +3,7 @@ import time
 
 # export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"  # 请根据实际情况调整 GPU 可见性
 
 from datasets import Dataset, load_dataset
 from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM, Trainer
@@ -13,13 +13,13 @@ from SwanLabTrainer import SwanLabTrainer
 import torch
 
 from tokenization import prepare_pretrain_dataset_from_text, prepare_sft_dataset_from_messages, build_tokenizer
-from train_utils import preview_collator_batch, part3_prepare_sft_source_dataset, part3_qa_text_to_messages
+from utils.train_utils import preview_collator_batch, part3_prepare_sft_source_dataset, part3_qa_text_to_messages
 from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoint
 
 
 IS_TEST = False
 TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
-DATA_MODE = "raw"  # 可选: "no_answer" / "#" / "attribute" / "raw"
+DATA_MODE = "no_answer"  # 可选: "no_answer" / "#" / "# #" / "#*10" / "attribute" / "raw" # 我现在tokenizer中的aplly_chat会自动加空格在Answer前
 
 # SFT/LORA 专用：指定要训练的 QA 属性文件列表，为空或 None 时使用 TRAIN_PARQUET_PATH 的 glob
 TRAIN_QA_FILES = [
@@ -49,8 +49,8 @@ if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
 
 	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_lr1e-03_wd1e-01_2026_04_13_22_00_10'
-	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_07'
-	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_59'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_07'
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_59'
 
 LORA_RANK_EMBED = 128
 LORA_RANK_QV = 16
