@@ -53,8 +53,8 @@ def _strip_all_prefixes(s: str) -> str:
             s = s[len(prefix):]
             break
     s = s.strip()
-    # 去掉开头单个 # 号（#January → January）
-    s = re.sub(r'^#\s*', '', s)
+    # 去掉开头所有 # 号（#January / # #January / # # # ...January → January）
+    s = re.sub(r'^#(?:\s*#)*\s*', '', s)
     s = s.strip()
     # 去掉末尾句号
     s = s.rstrip(".")
@@ -147,13 +147,11 @@ def main():
     parser.add_argument("--max_input_length", type=int, default=128)
     parser.add_argument("--max_new_tokens", type=int, default=32)
     parser.add_argument("--verbose_errors", type=int, default=5)
-    parser.add_argument(
-        "--result_dir",
-        type=str,
-        default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/result",
-        help="评测结果输出目录",
-    )
+    parser.add_argument("--result_dir", type=str,
+                        default="/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/result",
+                        help="评测结果输出目录")
     args = parser.parse_args()
+
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
     import torch

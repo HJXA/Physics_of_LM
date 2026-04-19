@@ -35,10 +35,15 @@ def _get_style_for(label):
     return {"color": color, "linestyle": linestyle, "marker": marker}
 
 
+IS_0419 = False
 RESULT_BASE = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/result"
 EVAL_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval.py")
 PLOT_DIR = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/eval/plots"
-GPU_IDS = [4,5,6,7]  # 指定可用的 GPU ID 列表，而非数量
+if IS_0419:
+    RESULT_BASE += "/0419"
+    PLOT_DIR += "/0419"
+    CHECKPOINT_BASE += "/0419"
+GPU_IDS = [4,5]  # 指定可用的 GPU ID 列表，而非数量
 
 
 def get_checkpoints_to_eval():
@@ -74,7 +79,7 @@ def get_checkpoints_to_eval():
 
 def _run_single_eval(task):
     """子进程 worker：从共享 GPU 队列中获取空闲 GPU，执行评测后归还。"""
-    model_path, test_dir, batch_size, max_input_length, max_new_tokens, gpu_queue = task
+    model_path, test_dir, batch_size, max_input_length, max_new_tokens, result_dir, gpu_queue = task
 
     # 从队列中获取一个空闲 GPU（阻塞等待）
     gpu_id = gpu_queue.get()
@@ -87,6 +92,7 @@ def _run_single_eval(task):
             "--batch_size", str(batch_size),
             "--max_input_length", str(max_input_length),
             "--max_new_tokens", str(max_new_tokens),
+            "--result_dir", result_dir,
         ]
 
         tag = f"[GPU{gpu_id}] {os.path.basename(os.path.dirname(model_path))}/{os.path.basename(model_path)}"
@@ -111,14 +117,14 @@ def _run_single_eval(task):
         gpu_queue.put(gpu_id)
 
 
-def collect_results():
+def collect_results(result_dir=RESULT_BASE):
     """
     从 result 目录收集所有 metrics 文件中的 accuracy（含 per-attribute）。
     返回: {model_type: {model_name: {step: {"overall": X, "birth_date": Y, ...}}}}
     """
     results = defaultdict(lambda: defaultdict(dict))
 
-    pattern = os.path.join(RESULT_BASE, "*", "*", "checkpoint*", "metrics_*.txt")
+    pattern = os.path.join(result_dir, "*", "*", "checkpoint*", "metrics_*.txt")
     for metrics_file in sorted(glob.glob(pattern)):
         parts = metrics_file.replace("\\", "/").split("/")
         # .../result/model_type/model_name/checkpoint-xxx/metrics_xxx.txt
@@ -305,6 +311,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=8192)
     parser.add_argument("--max_input_length", type=int, default=128)
     parser.add_argument("--max_new_tokens", type=int, default=32)
+    parser.add_argument("--result_dir", type=str, default=RESULT_BASE, help="评测结果输出目录")
     args = parser.parse_args()
 
     # ---- 评测阶段 ----
@@ -325,7 +332,7 @@ def main():
                 model_type = os.path.basename(os.path.dirname(exp_dir))
                 model_name = os.path.basename(exp_dir)
                 checkpoint_name = os.path.basename(ckpt)
-                result_subdir = os.path.join(RESULT_BASE, model_type, model_name, checkpoint_name)
+                result_subdir = os.path.join(args.result_dir, model_type, model_name, checkpoint_name)
                 existing_metrics = glob.glob(os.path.join(result_subdir, "metrics_*.txt"))
                 if existing_metrics:
                     skipped += 1
@@ -337,6 +344,7 @@ def main():
                     args.batch_size,
                     args.max_input_length,
                     args.max_new_tokens,
+                    args.result_dir,
                     None,  # gpu_queue 占位，下面统一填入
                 ))
 
@@ -351,8 +359,8 @@ def main():
             gpu_queue.put(g)
 
         # 将 gpu_queue 填入每个任务
-        all_tasks = [(ckpt, td, bs, mil, mnt, gpu_queue)
-                     for ckpt, td, bs, mil, mnt, _ in all_tasks]
+        all_tasks = [(ckpt, td, bs, mil, mnt, rd, gpu_queue)
+                     for ckpt, td, bs, mil, mnt, rd, _ in all_tasks]
 
         # 使用进程池并行执行，GPU 动态调度：哪个先完成就先领下一个
         with Pool(processes=len(GPU_IDS)) as pool:
@@ -369,7 +377,7 @@ def main():
         print(f"\n{'='*70}")
         print("收集结果并画图...")
         print(f"{'='*70}\n")
-        results = collect_results()
+        results = collect_results(args.result_dir)
         for model_type, experiments in results.items():
             print(f"  {model_type}: {len(experiments)} 条实验曲线")
         plot_results(results, PLOT_DIR)

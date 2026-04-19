@@ -19,7 +19,8 @@ from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoi
 
 IS_TEST = False
 TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
-DATA_MODE = "no_answer"  # 可选: "no_answer" / "#" / "# #" / "#*10" / "attribute" / "raw" # 我现在tokenizer中的aplly_chat会自动加空格在Answer前
+DATA_MODE = "raw"  # 可选: "no-answer" / "#" / "# #" / "#*10" / "attribute" / "raw" # 我现在tokenizer中的aplly_chat会自动加空格在Answer前
+SFT_CURRICULUM_MODE = True  # SFT 课程学习模式：按 TRAIN_QA_FILES 顺序读取，文件内 shuffle，文件间不 shuffle
 
 # SFT/LORA 专用：指定要训练的 QA 属性文件列表，为空或 None 时使用 TRAIN_PARQUET_PATH 的 glob
 TRAIN_QA_FILES = [
@@ -48,9 +49,9 @@ if TRAIN_TYPE == "PT":
 if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
 
-	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2_lr1e-03_wd1e-01_2026_04_13_22_00_10'
-	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_07'
-	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2_lr1e-03_wd1e-01_2026_04_13_22_03_59'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2'
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2'
 
 LORA_RANK_EMBED = 128
 LORA_RANK_QV = 16
@@ -89,7 +90,7 @@ PT_TRAIN_CONFIG = {
 
 # SFT 全量微调配置：AdamW, epsilon=1e-6, weight_decay=0.01, lr=3e-4, 无 warmup, 余弦衰减到初始 lr 的 10%
 SFT_TRAIN_CONFIG = {
-	"max_steps": 50000,
+	"max_steps": 10000,
 	"learning_rate": 0.0003,
 	"weight_decay": 0.01,
 	"adam_beta1": 0.9,
@@ -101,7 +102,7 @@ SFT_TRAIN_CONFIG = {
 	"per_device_train_batch_size": 48,
 	"gradient_accumulation_steps": 1,
 	"logging_steps": 100,
-	"save_steps": 2000,
+	"save_steps": 400,
 	"bf16": True,
 	"fp16": False,
 }
@@ -143,47 +144,34 @@ def get_sft_max_length_from_dataset(dataset: Dataset) -> int:
 	return 1 << (max_text_len - 1).bit_length()
 
 
-def format_scientific(value: float) -> str:
-	"""将浮点数格式化为适合目录名的科学计数法字符串。"""
-	return format(value, ".0e")
-
-
-def build_output_dir_tag(train_type: str, train_config: dict, mode: str = None, qa_files: list = None) -> str:
-	"""把关键训练超参编码到目录名里，便于区分不同实验。"""
-	tag = f"lr{format_scientific(train_config['learning_rate'])}_wd{format_scientific(train_config['weight_decay'])}"
-	if train_type == "LORA":
-		tag += f"_rank_embed{LORA_RANK_EMBED}_rank_qv{LORA_RANK_QV}"
-	if mode:
-		tag += f"_mode_{mode}"
-	if qa_files:
-		# 从文件名提取属性：q1_birth_date.parquet → birth_date
-		attrs = []
-		for f in qa_files:
-			name = os.path.splitext(os.path.basename(f))[0]  # q1_birth_date
-			parts = name.split("_", 1)  # ["q1", "birth_date"]
-			attrs.append(parts[1] if len(parts) > 1 else name)
-		tag += f"_qa{'_'.join(attrs)}"
-	return tag
 	
 	
 def part3_prepare_train_dataset(tokenizer, train_type: str):
 	"""按训练类型准备 tokenized dataset 与 data collator。"""
 
-	# SFT/LORA 优先使用 TRAIN_QA_FILES 列表
-	if train_type in {"SFT", "LORA"} and TRAIN_QA_FILES:
+	# SFT/LORA: 课程学习模式 vs 传统全局 shuffle 模式
+	if train_type in {"SFT", "LORA"} and SFT_CURRICULUM_MODE and TRAIN_QA_FILES:
+		from datasets import concatenate_datasets
+
+		datasets_parts = []
+		for i, qa_file in enumerate(TRAIN_QA_FILES):
+			ds = load_dataset("parquet", data_files={"train": qa_file})["train"]
+			ds = ds.shuffle(seed=42)
+			print(f"  课程学习 [{i+1}/{len(TRAIN_QA_FILES)}] {os.path.basename(qa_file)}: {len(ds)} samples")
+			datasets_parts.append(ds)
+		raw_dataset = concatenate_datasets(datasets_parts)
+		print(f"课程学习模式拼接完成，总样本数: {len(raw_dataset)}")
+	elif train_type in {"SFT", "LORA"} and TRAIN_QA_FILES:
 		data_path = TRAIN_QA_FILES
+		raw_dataset = load_dataset("parquet", data_files={"train": data_path})["train"]
+		raw_dataset = raw_dataset.shuffle(seed=42)
 	else:
 		data_path = TRAIN_PARQUET_PATH
-
-	raw_dataset = load_dataset(
-		"parquet",
-		data_files={"train": data_path},
-	)["train"]
+		raw_dataset = load_dataset("parquet", data_files={"train": data_path})["train"]
+		raw_dataset = raw_dataset.shuffle(seed=42)
 
 	if IS_TEST:
 		raw_dataset = raw_dataset.select(range(min(2, len(raw_dataset))))
-
-	raw_dataset = raw_dataset.shuffle(seed=42)  # 先打乱原始数据，避免后续 chunk 时样本分布不均
 
 	print("原始数据集加载完成，样例: ", raw_dataset[:10])
 	print("长度: ", len(raw_dataset))
@@ -288,13 +276,14 @@ def main():
 
 	preview_collator_batch(train_dataset=train_dataset, data_collator=data_collator, preview_n=1)
 
+	timestamp_short = time.strftime('%y%m%d%H')  # e.g. 26041916
 	if train_type == "PT":
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-2]
 		output_dir = os.path.join(
 			OUTPUT_BASE_DIR,
 			dataset_tag,
-			f"{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config,mode=DATA_MODE)}",
-		) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
+			f"{MODEL_PATH.split('/')[-1]}",
+		)
 	elif train_type in {"SFT", "LORA"}:
 		dataset_tag = TRAIN_PARQUET_PATH.split("/")[-3]
 		pt_datasets_type = MODEL_PATH.split("/")[-2]
@@ -303,8 +292,8 @@ def main():
 			OUTPUT_BASE_DIR,
 			f"{dataset_tag}",
 			pt_datasets_type,
-			f"{mode_prefix}{MODEL_PATH.split('/')[-1]}_{build_output_dir_tag(train_type,train_config,mode=DATA_MODE,qa_files=TRAIN_QA_FILES or None)}",
-		) + f"_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
+			f"{mode_prefix}{MODEL_PATH.split('/')[-1]}_{DATA_MODE}_{timestamp_short}",
+		)
 	if IS_TEST:
 		output_dir += "_test"
 
@@ -317,7 +306,11 @@ def main():
 		f"BF16={train_config['bf16']}, FP16={train_config['fp16']}"
 	)
 
-	# return 
+	# 课程学习模式: 关闭 Trainer 内部 DataLoader 的 shuffle，按数据集拼接顺序训练
+	sampling_strategy = "sequential" if (train_type in {"SFT", "LORA"} and SFT_CURRICULUM_MODE and TRAIN_QA_FILES) else "random"
+
+
+	# return
 
 
 	training_args = TrainingArguments(
@@ -344,7 +337,9 @@ def main():
 		dataloader_num_workers=4,
 		remove_unused_columns=False,
 		report_to="none",
-		save_only_model=False,
+		save_only_model= False if train_type == "PT" else True,  
+		train_sampling_strategy=sampling_strategy,
+		# use_liger_kernel = True
 	)
 
 	trainer = SwanLabTrainer(
