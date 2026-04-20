@@ -33,7 +33,7 @@ except ModuleNotFoundError:
 import swanlab
 
 class SwanLabTrainer(Trainer):
-    def __init__(self, *args, swanlab_project="test_physics_lm", swanlab_experiment_name="test", swanlab_description="gpt test Training with SwanLab",  test_falg = False,CoE_Flag=True, Train_type=None, **kwargs):
+    def __init__(self, *args, swanlab_project="test_physics_lm", swanlab_experiment_name="test", swanlab_description="gpt test Training with SwanLab",  test_falg = False,CoE_Flag=True, Train_type=None, Store_Flag=True, **kwargs):
         super().__init__(*args, **kwargs)
 
         # 统一训练类型开关：仅支持 PT / SFT / LORA。
@@ -56,6 +56,7 @@ class SwanLabTrainer(Trainer):
         )
 
         self.CoE_Flag=CoE_Flag
+        self.Store_Flag=Store_Flag
         self.step_count = 0 
 
         self.input = None
@@ -464,30 +465,32 @@ class SwanLabTrainer(Trainer):
 
             outputs.hidden_states = None  # 释放内存
 
-            save_path = os.path.join(
-                self.save_layer_hidden_root,
-                f"Step{self.step_count}_Rank{self.rank}.pt.gz"
-            )
+            if self.Store_Flag:
 
-            tensor_to_save = (
-                layer_hidden_state[:10]
-                .detach()
-                .to(torch.float8_e4m3fn)
-                .cpu()
-            )
-            if self.step_count == 1 and self.rank == 0:
-                print(f"准备保存 Layer Hidden State: {tensor_to_save.shape}, layer_hidden_state 原始形状: {layer_hidden_state.shape}")
+                save_path = os.path.join(
+                    self.save_layer_hidden_root,
+                    f"Step{self.step_count}_Rank{self.rank}.pt.gz"
+                )
 
-            
-            if self.test_falg and self.rank==0:
-                torch.cuda.synchronize()
-                save_layer_start = time.time()
-            self._submit_async_layer_save(tensor_to_save, save_path)
-            # torch.save(tensor_to_save, save_path)
-            if self.test_falg and self.rank==0:
-                torch.cuda.synchronize()
-                print("Layer Hidden 异步提交耗时(秒):", time.time()-save_layer_start)
-            tensor_to_save = None
+                tensor_to_save = (
+                    layer_hidden_state[:10]
+                    .detach()
+                    .to(torch.float8_e4m3fn)
+                    .cpu()
+                )
+                if self.step_count == 1 and self.rank == 0:
+                    print(f"准备保存 Layer Hidden State: {tensor_to_save.shape}, layer_hidden_state 原始形状: {layer_hidden_state.shape}")
+
+                
+                if self.test_falg and self.rank==0:
+                    torch.cuda.synchronize()
+                    save_layer_start = time.time()
+                self._submit_async_layer_save(tensor_to_save, save_path)
+                # torch.save(tensor_to_save, save_path)
+                if self.test_falg and self.rank==0:
+                    torch.cuda.synchronize()
+                    print("Layer Hidden 异步提交耗时(秒):", time.time()-save_layer_start)
+                tensor_to_save = None
 
             if self.test_falg and self.rank==0:
                 torch.cuda.synchronize()

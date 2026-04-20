@@ -3,7 +3,7 @@ import time
 
 # export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"  # 请根据实际情况调整 GPU 可见性
 
 from datasets import Dataset, load_dataset
 from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM, Trainer
@@ -24,12 +24,12 @@ SFT_CURRICULUM_MODE = True  # SFT 课程学习模式：按 TRAIN_QA_FILES 顺序
 
 # SFT/LORA 专用：指定要训练的 QA 属性文件列表，为空或 None 时使用 TRAIN_PARQUET_PATH 的 glob
 TRAIN_QA_FILES = [
-	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q1_birth_date.parquet",
-	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q2_birth_city.parquet",
-	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q3_university.parquet",
-	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q4_major.parquet",
-	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q5_company.parquet",
-	# "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q6_company_city.parquet",
+	"/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q1_birth_date.parquet",
+	"/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q2_birth_city.parquet",
+	"/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q3_university.parquet",
+	"/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q4_major.parquet",
+	"/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q5_company.parquet",
+	"/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/q6_company_city.parquet",
 ]
 
 
@@ -50,8 +50,8 @@ if TRAIN_TYPE in {"SFT", "LORA"}:
 	TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/QA/train/*.parquet"
 
 	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_single/llama2'
-	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2'
-	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi/llama2'
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/bioS_multi_permute_fullname/llama2'
 
 LORA_RANK_EMBED = 128
 LORA_RANK_QV = 16
@@ -90,7 +90,7 @@ PT_TRAIN_CONFIG = {
 
 # SFT 全量微调配置：AdamW, epsilon=1e-6, weight_decay=0.01, lr=3e-4, 无 warmup, 余弦衰减到初始 lr 的 10%
 SFT_TRAIN_CONFIG = {
-	"max_steps": 10000,
+	"max_steps": 50000,
 	"learning_rate": 0.0003,
 	"weight_decay": 0.01,
 	"adam_beta1": 0.9,
@@ -102,10 +102,31 @@ SFT_TRAIN_CONFIG = {
 	"per_device_train_batch_size": 48,
 	"gradient_accumulation_steps": 1,
 	"logging_steps": 100,
-	"save_steps": 400,
+	"save_steps": 2000,
 	"bf16": True,
 	"fp16": False,
 }
+
+if SFT_CURRICULUM_MODE:
+	SFT_TRAIN_CONFIG = {
+		"max_steps": 100000,
+		"learning_rate": 0.0003,
+		"weight_decay": 0.01,
+		"adam_beta1": 0.9,
+		"adam_beta2": 0.98,
+		"adam_epsilon": 1e-6,
+		"warmup_steps": 0,
+		"lr_scheduler_type": "cosine_with_min_lr",
+		"lr_scheduler_kwargs": {"min_lr": 0.00003},
+		"per_device_train_batch_size": 48,
+		"gradient_accumulation_steps": 1,
+		"logging_steps": 100,
+		"save_steps": 521,
+		"bf16": True,
+		"fp16": False,
+	}
+
+
 
 LORA_TRAIN_CONFIG = dict(SFT_TRAIN_CONFIG)
 
@@ -292,7 +313,7 @@ def main():
 			OUTPUT_BASE_DIR,
 			f"{dataset_tag}",
 			pt_datasets_type,
-			f"{mode_prefix}{MODEL_PATH.split('/')[-1]}_{DATA_MODE}_{timestamp_short}",
+			f"{mode_prefix}{MODEL_PATH.split('/')[-1]}_mode_{DATA_MODE}_{timestamp_short}",
 		)
 	if IS_TEST:
 		output_dir += "_test"
@@ -353,6 +374,7 @@ def main():
 		test_falg=IS_TEST,
 		CoE_Flag=True,
 		Train_type=train_type,
+		Store_Flag=False
 	)
 
 	train_result = trainer.train()

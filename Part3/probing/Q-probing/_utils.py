@@ -94,3 +94,75 @@ class LabelEncoder:
     def decode(self, idx: int) -> str:
         """将整数索引解码为字符串标签，未知索引返回 '<UNK>'。"""
         return self.id2label.get(idx, "<UNK>")
+
+
+def inspect_dataset_samples(
+    dataset,
+    tokenizer,
+    label_encoder: "LabelEncoder | None" = None,
+    mode: str = "auto",
+    num_samples: int = 3,
+):
+    """可视化数据集样本，支持分类和 SFT 两种数据格式。
+
+    Args:
+        dataset: datasets.Dataset 对象，需包含 input_ids, attention_mask, labels 列
+        tokenizer: 分词器，用于将 token id 反解码为文本
+        label_encoder: 分类标签编码器（仅分类模式需要，用于将整数标签解码为字符串）
+        mode: 数据格式，"auto" 自动判断 / "classification" 分类 / "sft" 序列标注
+        num_samples: 打印的样本数量
+    """
+    n = min(num_samples, len(dataset))
+
+    for i in range(n):
+        sample = dataset[i]
+        input_ids = sample["input_ids"]
+        attention_mask = sample["attention_mask"]
+        labels = sample["labels"]
+
+        # 自动判断模式：labels 长度与 input_ids 相同 → SFT，否则 → 分类
+        if mode == "auto":
+            if isinstance(labels, (list, tuple)) and len(labels) == len(input_ids):
+                mode = "sft"
+            else:
+                mode = "classification"
+
+        # 反解码完整文本
+        text = tokenizer.decode(input_ids, skip_special_tokens=False)
+
+        # 截断过长序列的显示
+        def _short(lst, max_show=20):
+            lst = list(lst)
+            if len(lst) <= max_show:
+                return str(lst)
+            return str(lst[:max_show // 2])[:-1] + ", ..., " + str(lst[-max_show // 2:])[1:]
+
+        print(f"\n{'=' * 50}")
+        print(f"                样本 {i}")
+        print(f"{'=' * 50}")
+        print(f"input_ids     : {_short(input_ids)} (长度={len(input_ids)})")
+        print(f"反解码文本    : {text}")
+        print(f"attention_mask: {_short(attention_mask)}")
+
+        if mode == "classification":
+            print(f"\n--- 分类模式 ---")
+            print(f"标签(id)      : {labels}")
+            if label_encoder is not None:
+                print(f"标签(文本)    : \"{label_encoder.decode(labels)}\"")
+        else:
+            print(f"\n--- SFT 模式 ---")
+            print(f"labels        : {_short(labels)}")
+            # 找到非 -100 的位置
+            valid_positions = [j for j, l in enumerate(labels) if l != -100]
+            if valid_positions:
+                valid_token_ids = [labels[j] for j in valid_positions]
+                decoded_valid = tokenizer.decode(valid_token_ids, skip_special_tokens=False)
+                print(f"有效token反解  : \"{decoded_valid}\"")
+                # 逐位置展示
+                pos_details = ", ".join(
+                    f"位置[{j}]->\"{tokenizer.decode([labels[j]], skip_special_tokens=False)}\""
+                    for j in valid_positions
+                )
+                print(f"有效位置详情  : {pos_details}")
+            else:
+                print("有效token反解  : （无有效标签位置）")

@@ -43,7 +43,7 @@ if IS_0419:
     RESULT_BASE += "/0419"
     PLOT_DIR += "/0419"
     CHECKPOINT_BASE += "/0419"
-GPU_IDS = [4,5]  # 指定可用的 GPU ID 列表，而非数量
+GPU_IDS = [4,5,6,7]  # 指定可用的 GPU ID 列表，而非数量
 
 
 def get_checkpoints_to_eval():
