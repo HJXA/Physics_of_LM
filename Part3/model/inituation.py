@@ -1,31 +1,60 @@
 from transformers import LlamaConfig, LlamaForCausalLM, AutoTokenizer
 
-# 1️⃣ 构建 config
-config = LlamaConfig(
+tokenizer = AutoTokenizer.from_pretrained("/ruilab/jxhe/CoE_Monitor/checkpoints/llama-2-7b")
+
+def init_and_save(name, config, save_path):
+    model = LlamaForCausalLM(config)
+    total_params = model.num_parameters()
+    if total_params >= 1e9:
+        print(f"{name}参数量: {total_params / 1e9:.2f} B")
+    else:
+        print(f"{name}参数量: {total_params / 1e6:.2f} M")
+    model.save_pretrained(save_path)
+    tokenizer.save_pretrained(save_path)
+    print(f"{name}已保存到: {save_path}")
+
+
+# ========== 162M 参数模型 ==========
+init_and_save("162M", LlamaConfig(
     hidden_size=768,
     intermediate_size=768*4,
     num_hidden_layers=12,
     num_attention_heads=12,
     max_position_embeddings=512,
-)
+), "./Part3/checkpoints/llama2_162M")
 
-tokenizer = AutoTokenizer.from_pretrained("/ruilab/jxhe/CoE_Monitor/checkpoints/llama-2-7b")
+# ========== 83M 参数模型 ==========
+init_and_save("83M", LlamaConfig(
+    hidden_size=512,
+    intermediate_size=512*4,
+    num_hidden_layers=12,
+    num_attention_heads=8,
+    max_position_embeddings=512,
+), "./Part3/checkpoints/llama2_83m")
 
-# 2️⃣ 初始化模型（随机权重）
-model = LlamaForCausalLM(config)
+# ========== 40M 参数模型 ==========
+init_and_save("40M", LlamaConfig(
+    hidden_size=384,
+    intermediate_size=384*4,
+    num_hidden_layers=6,
+    num_attention_heads=6,
+    max_position_embeddings=512,
+), "./Part3/checkpoints/llama2_40m")
 
-total_params = model.num_parameters()
+# ========== 20M 参数模型 ==========
+init_and_save("20M", LlamaConfig(
+    hidden_size=256,
+    intermediate_size=256*4,
+    num_hidden_layers=6,
+    num_attention_heads=4,
+    max_position_embeddings=512,
+), "./Part3/checkpoints/llama2_20m")
 
-if total_params >= 1e9:
-    print(f"参数量: {total_params / 1e9:.2f} B")
-else:
-    print(f"参数量: {total_params / 1e6:.2f} M")
-
-# 3️⃣ 保存路径
-save_path = "./Part3/checkpoints/llama2_init"
-
-# 4️⃣ 保存模型 + config
-model.save_pretrained(save_path)
-tokenizer.save_pretrained(save_path)
-
-print(f"模型已保存到: {save_path}")
+# ========== 10M 参数模型 ==========
+init_and_save("10M", LlamaConfig(
+    hidden_size=128,
+    intermediate_size=128*4,
+    num_hidden_layers=6,
+    num_attention_heads=4,
+    max_position_embeddings=512,
+), "./Part3/checkpoints/llama2_10m")

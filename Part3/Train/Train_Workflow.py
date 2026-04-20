@@ -3,7 +3,7 @@ import time
 
 # export PATH="/ruilab/jxhe/miniconda3/envs/PoL/bin:$PATH"
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"  # 请根据实际情况调整 GPU 可见性
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"  # 请根据实际情况调整 GPU 可见性
 
 from datasets import Dataset, load_dataset
 from transformers import AutoTokenizer, TrainingArguments, set_seed, AutoModelForCausalLM, Trainer
@@ -18,9 +18,9 @@ from utils.merge_lora_checkpoints import find_checkpoints, merge_single_checkpoi
 
 
 IS_TEST = False
-TRAIN_TYPE = "LORA"  # 可选: "PT" / "SFT" / "LORA"
+TRAIN_TYPE = "PT"  # 可选: "PT" / "SFT" / "LORA"
 DATA_MODE = "raw"  # 可选: "no-answer" / "#" / "# #" / "#*10" / "attribute" / "raw" # 我现在tokenizer中的aplly_chat会自动加空格在Answer前
-SFT_CURRICULUM_MODE = True  # SFT 课程学习模式：按 TRAIN_QA_FILES 顺序读取，文件内 shuffle，文件间不 shuffle
+SFT_CURRICULUM_MODE = False  # SFT 课程学习模式：按 TRAIN_QA_FILES 顺序读取，文件内 shuffle，文件间不 shuffle
 
 # SFT/LORA 专用：指定要训练的 QA 属性文件列表，为空或 None 时使用 TRAIN_PARQUET_PATH 的 glob
 TRAIN_QA_FILES = [
@@ -37,7 +37,10 @@ TRAIN_QA_FILES = [
 # PT
 # MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2'
 if TRAIN_TYPE == "PT":
-	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2_10m'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2_20m'
+	# MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2_40m'
+	MODEL_PATH = '/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/checkpoints/llama2_80m'
 
 	# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_single/part_1.parquet"
 	# TRAIN_PARQUET_PATH = "/ruilab/jxhe/CoE_Monitor/Physics_of_LM/Part3/datasets/text/bioS_multi/part_*.parquet"
