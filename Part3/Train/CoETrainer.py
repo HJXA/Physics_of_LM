@@ -32,9 +32,17 @@ except ModuleNotFoundError:
 
 import swanlab
 
-class SwanLabTrainer(Trainer):
-    def __init__(self, *args, swanlab_project="test_physics_lm", swanlab_experiment_name="test", swanlab_description="gpt test Training with SwanLab",  test_falg = False,CoE_Flag=True, Train_type=None, Store_Flag=True, **kwargs):
+class CoETrainer(Trainer):
+    def __init__(self, *args,swanlab_project,swanlab_experiment_name,  test_falg = False,CoE_Flag=True, Train_type=None, Store_Flag=True, **kwargs):
+
+        swanlab.init(
+            project=swanlab_project,
+            experiment_name=swanlab_experiment_name,
+        ) # 配置会由Trainer传
+
         super().__init__(*args, **kwargs)
+
+        
 
         # 统一训练类型开关：仅支持 PT / SFT / LORA。
         self.train_type = str(Train_type or "PT").upper()
@@ -45,15 +53,6 @@ class SwanLabTrainer(Trainer):
         # 语义化布尔开关，便于后续逻辑分支可读。
         self.is_pt_mode = self.train_type == "PT"
         self.is_sft_mode = self.train_type == "SFT" or self.train_type == "LORA"  # LORA 训练也算 SFT 模式（在 base model 上微调）
-        
-        # 1. 开启一个 SwanLab 实验
-        # 将 TrainingArguments 中的超参数存入 swanlab.config
-        swanlab.init(
-            project=swanlab_project,
-            experiment_name=swanlab_experiment_name,
-            description=swanlab_description,
-            config=self.args.to_dict()
-        )
 
         self.CoE_Flag=CoE_Flag
         self.Store_Flag=Store_Flag

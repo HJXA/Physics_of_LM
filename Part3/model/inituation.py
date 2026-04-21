@@ -58,3 +58,4 @@ init_and_save("10M", LlamaConfig(
     num_attention_heads=4,
     max_position_embeddings=512,
 ), "./Part3/checkpoints/llama2_10m")
+
